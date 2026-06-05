@@ -37,13 +37,24 @@ async def translate_websocket(ws: WebSocket):
         async for raw in ws.iter_text():
             try:
                 data = json.loads(raw)
-                logger.info(f"收到: {data.get('type')}")
             except json.JSONDecodeError:
                 await ws.send_json(
                     ServerMessage.error(
                         ErrorMessage(code="INVALID_JSON", message="无法解析 JSON")
                     ).model_dump()
                 )
+                continue
+
+            msg_type = data.get("type")
+            if not msg_type:
+                await ws.send_json(
+                    ServerMessage.error(
+                        ErrorMessage(code="MISSING_TYPE", message="缺少 type 字段")
+                    ).model_dump()
+                )
+                continue
+
+            logger.info(f"收到: {msg_type}")
     except WebSocketDisconnect:
         logger.info("客户端断开连接")
     finally:
