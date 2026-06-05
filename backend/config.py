@@ -1,0 +1,64 @@
+"""DitingVeritas 配置"""
+import os
+from dataclasses import dataclass, field
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+@dataclass
+class AudioConfig:
+    sample_rate: int = 16000
+    channels: int = 1
+    block_size: int = 1024
+    device_index: int | None = None
+    dtype: str = "float32"
+
+
+@dataclass
+class VADConfig:
+    threshold: float = 0.5
+    min_speech_duration_ms: int = 200
+    min_silence_duration_ms: int = 300
+    speech_pad_ms: int = 100
+    sample_rate: int = 16000
+
+
+@dataclass
+class ASRConfig:
+    model_size: str = "small"
+    compute_type: str = "int8"
+    language: str = "en"
+    beam_size: int = 5
+    vad_filter: bool = True
+
+
+@dataclass
+class TranslatorConfig:
+    model: str = "claude-sonnet-4-6"
+    temperature: float = 0.3
+    max_tokens: int = 1024
+    system_prompt: str = field(
+        default="你是同声传译专家。将英文翻译成简洁中文。只输出译文。"
+    )
+
+
+@dataclass
+class ContextConfig:
+    inference_duration_seconds: int = 15
+    cache_ttl_minutes: int = 60
+
+
+@dataclass
+class Config:
+    audio: AudioConfig = field(default_factory=AudioConfig)
+    vad: VADConfig = field(default_factory=VADConfig)
+    asr: ASRConfig = field(default_factory=ASRConfig)
+    translator: TranslatorConfig = field(default_factory=TranslatorConfig)
+    context: ContextConfig = field(default_factory=ContextConfig)
+    anthropic_api_key: str = field(
+        default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", "")
+    )
+
+
+config = Config()
