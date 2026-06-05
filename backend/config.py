@@ -30,7 +30,7 @@ class ASRConfig:
     compute_type: str = "int8"
     language: str = "en"
     beam_size: int = 5
-    vad_filter: bool = True
+    vad_filter: bool = False  # 由外部 VAD 模块处理
 
 
 @dataclass
