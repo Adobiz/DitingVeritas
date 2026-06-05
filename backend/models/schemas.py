@@ -43,6 +43,9 @@ class ContextUpdate(BaseModel):
 
     @classmethod
     def from_string(cls, s: str):
+        s = s.strip()
+        if not s:
+            return cls()
         return cls(keywords=[k.strip() for k in s.split(",") if k.strip()])
 
 
@@ -98,3 +101,23 @@ class ServerMessage(BaseModel):
     type: OutputType
     payload: Payload
     timestamp: float = Field(default_factory=time.time)
+
+    @classmethod
+    def translation(cls, p: TranslationResult) -> "ServerMessage":
+        return cls(type=OutputType.TRANSLATION, payload=p)
+
+    @classmethod
+    def correction(cls, p: CorrectionResult) -> "ServerMessage":
+        return cls(type=OutputType.CORRECTION, payload=p)
+
+    @classmethod
+    def status(cls, p: StatusUpdate) -> "ServerMessage":
+        return cls(type=OutputType.STATUS, payload=p)
+
+    @classmethod
+    def error(cls, p: ErrorMessage) -> "ServerMessage":
+        return cls(type=OutputType.ERROR, payload=p)
+
+    @classmethod
+    def context_ready(cls, p: ContextReady) -> "ServerMessage":
+        return cls(type=OutputType.CONTEXT_READY, payload=p)
