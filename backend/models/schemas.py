@@ -2,12 +2,14 @@
 import time
 import uuid
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MessageType(str, Enum):
     START = "start"
     STOP = "stop"
+    PAUSE = "pause"
+    RESUME = "resume"
     CONTEXT_UPDATE = "context_update"
 
 
@@ -23,6 +25,7 @@ class PipelineStatus(str, Enum):
     IDLE = "idle"
     STARTING = "starting"
     RUNNING = "running"
+    PAUSED = "paused"
     STOPPING = "stopping"
     ERROR = "error"
 
@@ -36,16 +39,20 @@ class AudioQuality(str, Enum):
 class ContextUpdate(BaseModel):
     url: str | None = None
     title: str | None = None
-    keywords: str | None = None
+    keywords: list[str] | None = None
+
+    @classmethod
+    def from_string(cls, s: str):
+        s = s.strip()
+        if not s:
+            return cls()
+        return cls(keywords=[k.strip() for k in s.split(",") if k.strip()])
 
 
 class StartRequest(BaseModel):
     source_lang: str = "en"
     target_lang: str = "zh"
     context: ContextUpdate | None = None
-
-
-# ── 服务端 → 客户端 ──────────────────────────────
 
 
 class TranslationResult(BaseModel):
@@ -65,6 +72,7 @@ class CorrectionResult(BaseModel):
 
 
 class StatusUpdate(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
     status: PipelineStatus
     message: str = ""
     audio_quality: AudioQuality | None = None
@@ -76,6 +84,7 @@ class ContextReady(BaseModel):
     keywords: list[str]
     style: str
     source: str
+    timestamp: float = Field(default_factory=time.time)
 
 
 class ErrorMessage(BaseModel):
@@ -84,7 +93,31 @@ class ErrorMessage(BaseModel):
     recoverable: bool = True
 
 
+Payload = TranslationResult | CorrectionResult | StatusUpdate | ContextReady | ErrorMessage
+
+
 class ServerMessage(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
     type: OutputType
-    payload: dict
+    payload: Payload
     timestamp: float = Field(default_factory=time.time)
+
+    @classmethod
+    def translation(cls, p: TranslationResult) -> "ServerMessage":
+        return cls(type=OutputType.TRANSLATION, payload=p)
+
+    @classmethod
+    def correction(cls, p: CorrectionResult) -> "ServerMessage":
+        return cls(type=OutputType.CORRECTION, payload=p)
+
+    @classmethod
+    def status(cls, p: StatusUpdate) -> "ServerMessage":
+        return cls(type=OutputType.STATUS, payload=p)
+
+    @classmethod
+    def error(cls, p: ErrorMessage) -> "ServerMessage":
+        return cls(type=OutputType.ERROR, payload=p)
+
+    @classmethod
+    def context_ready(cls, p: ContextReady) -> "ServerMessage":
+        return cls(type=OutputType.CONTEXT_READY, payload=p)
