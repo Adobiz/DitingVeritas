@@ -8,7 +8,7 @@ load_dotenv()
 
 @dataclass
 class AudioConfig:
-    sample_rate: int = 16000
+    sample_rate: int = 44100  # WASAPI 设备原生率，内部重采样到 16kHz
     channels: int = 1
     block_size: int = 1024
     device_index: int | None = None

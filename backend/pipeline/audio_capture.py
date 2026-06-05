@@ -7,45 +7,38 @@ import sounddevice as sd
 
 from config import config
 
+_TARGET_SR = 16000  # VAD/ASR 统一使用 16kHz
+
+
+def _resample(audio: np.ndarray, orig_sr: int) -> np.ndarray:
+    """降采样到 16kHz（线性插值）"""
+    if orig_sr == _TARGET_SR:
+        return audio
+    dur = len(audio) / orig_sr
+    n = max(1, int(dur * _TARGET_SR))
+    return np.interp(
+        np.linspace(0, dur, n),
+        np.linspace(0, dur, len(audio)),
+        audio,
+    ).astype(np.float32)
+
 logger = logging.getLogger("diting.audio")
 
 
 def _find_loopback_device() -> int:
-    """查找 WASAPI loopback 设备，找不到回退默认输入"""
     devices = sd.query_devices()
-    hostapis = sd.query_hostapis()
+    keys = ("立体声混音", "stereo mix", "wave out mix", "loopback", "what u hear")
 
-    wasapi_id = None
-    for i, api in enumerate(hostapis):
-        if "WASAPI" in api["name"]:
-            wasapi_id = i
-            break
+    for i, dev in enumerate(devices):
+        if dev["max_input_channels"] == 0:
+            continue
+        if any(k in dev["name"].lower() for k in keys):
+            logger.info(f"Loopback: [{i}] {dev['name']}")
+            return i
 
-    # WASAPI loopback 设备关键词（不同系统叫法不同）
-    loopback_keys = ("loopback", "立体声混音", "stereo mix", "扬声器", "speakers",
-                     "耳机", "headphones", "输出", "output", "播放")
+    logger.warning("未找到 loopback 设备！请在 Windows 声音设置中启用立体声混音。")
+    return sd.default.device[0] or 0
 
-    if wasapi_id is not None:
-        for i, dev in enumerate(devices):
-            if dev["hostapi"] != wasapi_id:
-                continue
-            if dev["max_input_channels"] == 0:
-                continue
-            name = dev["name"].lower()
-            if any(k in name for k in loopback_keys):
-                logger.info(f"Loopback 设备: [{i}] {dev['name']}")
-                return i
-
-    # 回退：WASAPI 下任意有输入通道的设备
-    if wasapi_id is not None:
-        for i, dev in enumerate(devices):
-            if dev["hostapi"] == wasapi_id and dev["max_input_channels"] > 0:
-                logger.info(f"WASAPI 输入设备: [{i}] {dev['name']}")
-                return i
-
-    fallback = sd.default.device[0] or 0
-    logger.warning(f"未找到 loopback，回退设备 [{fallback}]")
-    return fallback
 
 
 class AudioCapture:
@@ -54,6 +47,9 @@ class AudioCapture:
         self._running = False
         self._error: str | None = None
         self._device = config.audio.device_index or _find_loopback_device()
+        # 查询设备实际采样率
+        dev_info = sd.query_devices(self._device)
+        self._sample_rate = int(dev_info["default_samplerate"])
 
     @property
     def running(self) -> bool:
@@ -87,10 +83,12 @@ class AudioCapture:
             if status:
                 logger.debug(f"音频状态: {status}")
             mono = indata[:, 0].copy() if indata.ndim > 1 else indata.copy()
+            # 重采样到 16kHz
+            mono = _resample(mono, self._sample_rate)
             rms = float(np.sqrt(np.mean(mono**2) + 1e-10))
             try:
                 on_chunk(mono, rms)
-                errors = 0  # 成功则重置
+                errors = 0
             except Exception as e:
                 errors += 1
                 logger.error(f"音频回调异常 ({errors}/{max_errors}): {e}")
@@ -103,7 +101,7 @@ class AudioCapture:
             self._stream = sd.InputStream(
                 device=self._device,
                 channels=config.audio.channels,
-                samplerate=config.audio.sample_rate,
+                samplerate=self._sample_rate,
                 blocksize=config.audio.block_size,
                 dtype="float32",
                 callback=_callback,
