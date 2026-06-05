@@ -73,15 +73,24 @@ class AudioCapture:
         if self._running:
             return
 
+        errors = 0
+        max_errors = 10  # 连续 10 次异常则熔断
+
         def _callback(indata: np.ndarray, frames, time_info, status):
+            nonlocal errors
             if status:
                 logger.debug(f"音频状态: {status}")
             mono = indata[:, 0].copy() if indata.ndim > 1 else indata.copy()
             rms = float(np.sqrt(np.mean(mono**2) + 1e-10))
             try:
                 on_chunk(mono, rms)
+                errors = 0  # 成功则重置
             except Exception as e:
-                logger.error(f"音频回调异常: {e}")
+                errors += 1
+                logger.error(f"音频回调异常 ({errors}/{max_errors}): {e}")
+                if errors >= max_errors:
+                    logger.critical("连续回调异常，触发熔断")
+                    self.stop()
 
         try:
             self._stream = sd.InputStream(
