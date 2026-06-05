@@ -36,16 +36,17 @@ class AudioQuality(str, Enum):
 class ContextUpdate(BaseModel):
     url: str | None = None
     title: str | None = None
-    keywords: str | None = None
+    keywords: list[str] | None = None
+
+    @classmethod
+    def from_string(cls, s: str):
+        return cls(keywords=[k.strip() for k in s.split(",") if k.strip()])
 
 
 class StartRequest(BaseModel):
     source_lang: str = "en"
     target_lang: str = "zh"
     context: ContextUpdate | None = None
-
-
-# ── 服务端 → 客户端 ──────────────────────────────
 
 
 class TranslationResult(BaseModel):
@@ -76,6 +77,7 @@ class ContextReady(BaseModel):
     keywords: list[str]
     style: str
     source: str
+    timestamp: float = Field(default_factory=time.time)
 
 
 class ErrorMessage(BaseModel):
@@ -84,7 +86,10 @@ class ErrorMessage(BaseModel):
     recoverable: bool = True
 
 
+Payload = TranslationResult | CorrectionResult | StatusUpdate | ContextReady | ErrorMessage
+
+
 class ServerMessage(BaseModel):
     type: OutputType
-    payload: dict
+    payload: Payload
     timestamp: float = Field(default_factory=time.time)
