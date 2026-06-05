@@ -52,11 +52,16 @@ class AudioCapture:
     def __init__(self):
         self._stream: sd.InputStream | None = None
         self._running = False
+        self._error: str | None = None
         self._device = config.audio.device_index or _find_loopback_device()
 
     @property
     def running(self) -> bool:
         return self._running
+
+    @property
+    def error(self) -> str | None:
+        return self._error
 
     def list_devices(self) -> list[dict]:
         return [
@@ -73,6 +78,7 @@ class AudioCapture:
         if self._running:
             return
 
+        self._error = None
         errors = 0
         max_errors = 10  # 连续 10 次异常则熔断
 
@@ -89,7 +95,8 @@ class AudioCapture:
                 errors += 1
                 logger.error(f"音频回调异常 ({errors}/{max_errors}): {e}")
                 if errors >= max_errors:
-                    logger.critical("连续回调异常，触发熔断")
+                    self._error = f"回调连续异常 {errors} 次，已熔断"
+                    logger.critical(self._error)
                     self.stop()
 
         try:
