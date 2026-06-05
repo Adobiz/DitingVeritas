@@ -41,3 +41,8 @@ async def translate_websocket(ws: WebSocket):
         logger.info("客户端断开连接")
     except json.JSONDecodeError:
         logger.warning("收到无效 JSON")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8765)
