@@ -64,7 +64,9 @@ class VoiceActivityDetector:
         while len(self._buffer) >= min_chunk:
             frame = self._buffer[:min_chunk]
             try:
-                prob = self._model(frame, sr).item()
+                import torch
+                t = torch.from_numpy(frame)
+                prob = self._model(t, sr).item()
             except Exception:
                 prob = 0.0
 
