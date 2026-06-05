@@ -65,7 +65,10 @@ class VoiceActivityDetector:
                 else:
                     self._speech_start_sample -= overflow
                     if self._silence_start_sample is not None:
-                        self._silence_start_sample = max(0, self._silence_start_sample - overflow)
+                        if self._silence_start_sample < overflow:
+                            self._silence_start_sample = None
+                        else:
+                            self._silence_start_sample -= overflow
 
         segments = []
         step = 512
@@ -92,6 +95,7 @@ class VoiceActivityDetector:
                     self._audio_buffer = self._audio_buffer[remove:]
                     self._process_pos = 0
                     self._speaking = False
+                    self._speech_start_sample = 0
                     self._silence_start_sample = None
                     continue
 
