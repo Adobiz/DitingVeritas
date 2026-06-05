@@ -2,12 +2,14 @@
 import time
 import uuid
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MessageType(str, Enum):
     START = "start"
     STOP = "stop"
+    PAUSE = "pause"
+    RESUME = "resume"
     CONTEXT_UPDATE = "context_update"
 
 
@@ -66,6 +68,7 @@ class CorrectionResult(BaseModel):
 
 
 class StatusUpdate(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
     status: PipelineStatus
     message: str = ""
     audio_quality: AudioQuality | None = None
@@ -90,6 +93,7 @@ Payload = TranslationResult | CorrectionResult | StatusUpdate | ContextReady | E
 
 
 class ServerMessage(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
     type: OutputType
     payload: Payload
     timestamp: float = Field(default_factory=time.time)
