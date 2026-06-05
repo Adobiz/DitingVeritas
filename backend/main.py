@@ -5,6 +5,7 @@ import logging
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 from models.schemas import (
+    ErrorMessage,
     PipelineStatus,
     ServerMessage,
     StatusUpdate,
@@ -34,13 +35,19 @@ async def translate_websocket(ws: WebSocket):
 
     try:
         async for raw in ws.iter_text():
-            data = json.loads(raw)
-            logger.info(f"收到: {data.get('type')}")
-
+            try:
+                data = json.loads(raw)
+                logger.info(f"收到: {data.get('type')}")
+            except json.JSONDecodeError:
+                await ws.send_json(
+                    ServerMessage.error(
+                        ErrorMessage(code="INVALID_JSON", message="无法解析 JSON")
+                    ).model_dump()
+                )
     except WebSocketDisconnect:
         logger.info("客户端断开连接")
-    except json.JSONDecodeError:
-        logger.warning("收到无效 JSON")
+    finally:
+        logger.info("WebSocket 连接关闭")
 
 
 if __name__ == "__main__":
