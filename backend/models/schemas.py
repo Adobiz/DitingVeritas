@@ -25,6 +25,7 @@ class PipelineStatus(str, Enum):
     IDLE = "idle"
     STARTING = "starting"
     RUNNING = "running"
+    PAUSED = "paused"
     STOPPING = "stopping"
     ERROR = "error"
 
