@@ -98,6 +98,7 @@ class TranslationPipeline:
     async def _run(self):
         loop = asyncio.get_running_loop()
         last_quality = None
+        diag_n = 0
 
         while self.status == PipelineStatus.RUNNING:
             try:
@@ -107,6 +108,11 @@ class TranslationPipeline:
 
             if self.status != PipelineStatus.RUNNING:
                 break
+
+            # 诊断：每 3 秒输出队列状态和 RMS
+            diag_n += 1
+            if diag_n % 120 == 1:
+                logger.info(f"[诊断] 队列≈{self._queue.qsize()}, RMS≈{rms:.4f}")
 
             # VAD 切句
             try:
