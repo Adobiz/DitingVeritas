@@ -21,6 +21,7 @@ from models.schemas import (
 from pipeline.audio_capture import AudioCapture
 from pipeline.vad import VoiceActivityDetector
 from pipeline.asr import ASREngine
+from pipeline.translator import create_translator
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logger = logging.getLogger("diting")
@@ -36,6 +37,7 @@ class TranslationPipeline:
         self._audio = AudioCapture()
         self._vad = VoiceActivityDetector()
         self._asr = ASREngine()
+        self._translator = create_translator()
         self._queue: asyncio.Queue = asyncio.Queue(maxsize=64)
         self._task: asyncio.Task | None = None
         self.source_lang = "en"
@@ -127,8 +129,11 @@ class TranslationPipeline:
                 text = " ".join(r["text"] for r in results)
                 logger.info(f"ASR: {text[:80]}")
 
+                translation = await self._translator.translate_async(text)
+                logger.info(f"翻译: {translation[:50]}")
+
                 await self._send(ServerMessage.translation(
-                    TranslationResult(source_text=text, translation="", is_partial=False)
+                    TranslationResult(source_text=text, translation=translation, is_partial=False)
                 ))
 
             # 音频质量推送
