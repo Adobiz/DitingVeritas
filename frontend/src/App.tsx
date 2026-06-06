@@ -27,8 +27,11 @@ export default function App() {
       <h1 style={{ fontSize: 20, marginBottom: 16 }}>谛听·译真</h1>
       <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
         <button onClick={status === "running" ? handleStop : handleStart}
-          style={{ padding: "8px 20px", borderRadius: 6, border: "none", cursor: "pointer",
-            background: status === "running" ? "#ef4444" : "#4ade80", color: "#000", fontWeight: 600 }}>
+          disabled={!connected}
+          title={!connected ? "请先启动后端 python main.py" : ""}
+          style={{ padding: "8px 20px", borderRadius: 6, border: "none", cursor: connected ? "pointer" : "not-allowed",
+            background: status === "running" ? "#ef4444" : "#4ade80", color: "#000", fontWeight: 600,
+            opacity: connected ? 1 : 0.5 }}>
           {status === "running" ? "■ 停止" : "▶ 开始翻译"}
         </button>
         <button onClick={connect}
