@@ -68,23 +68,27 @@ function ControlBall() {
   const hasTrans = translation && translation !== source;
   const q = !connected ? "#ef4444" : isRunning ? "#4ade80" : "#9ca3af";
 
-  // 自适应窗口高度（设置打开时固定 340，否则跟随内容）
+  // 自适应窗口高度
   useEffect(() => {
     if (!expanded) return;
+
     if (settings) { window.electronAPI?.setHeight(showAddModel ? 560 : 460); return; }
+    if (!isRunning && !showControls) { window.electronAPI?.setHeight(80); return; }
     if (!isRunning) { window.electronAPI?.setHeight(200); return; }
+
     const el = panelRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
       clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         const h = el.scrollHeight;
-        window.electronAPI?.setHeight(Math.max(100, Math.min(h + 20, 400)));
+        const min = showControls ? 120 : 100;
+        window.electronAPI?.setHeight(Math.max(min, Math.min(h + 20, 400)));
       }, 200);
     });
     ro.observe(el);
     return () => { ro.disconnect(); clearTimeout(debounceRef.current); };
-  }, [expanded, settings, isRunning, showAddModel]);
+  }, [expanded, settings, isRunning, showAddModel, showControls]);
 
   if (!expanded) {
     return (
@@ -104,7 +108,7 @@ function ControlBall() {
 
   return (
     <div ref={panelRef} style={{
-      height: "auto", padding: settings ? 12 : "0 12px",
+      height: "auto", minHeight: showControls ? "auto" : 80, padding: settings ? 12 : "0 12px",
       background: "rgba(0,0,0,0.78)", backdropFilter: settings ? "blur(14px)" : "blur(12px)",
       borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)",
       fontSize: 13, color: "#fff", userSelect: "none",
@@ -121,6 +125,9 @@ function ControlBall() {
               style={btn(isRunning ? "#374151" : q)}>
               {isRunning ? "■" : "▶"}
             </button>
+            <button onClick={() => { if (!isRunning) return; setShowControls(!showControls); setSettings(false); }}
+              disabled={!isRunning} title={isRunning ? "字幕模式" : "启动后可切换"}
+              style={{ ...btn(!showControls && isRunning ? q : "#374151"), opacity: isRunning ? 1 : 0.3 }}>▤</button>
             <button onClick={toggleSettings} style={btn(settings ? q : "#374151")}>⚙</button>
           </div>
           <span onClick={toggle} style={{
@@ -132,7 +139,8 @@ function ControlBall() {
 
       {isRunning && (
         <div onDoubleClick={() => setShowControls(!showControls)} style={{
-          margin: settings ? 0 : "8px 4px 4px 4px", padding: "12px 16px", borderRadius: 8,
+          flex: 1, display: "flex", flexDirection: "column", justifyContent: "center",
+          padding: "12px 16px", borderRadius: 8, margin: 0,
           background: "rgba(255,255,255,0.04)", WebkitAppRegion: "no-drag",
           cursor: "pointer",
         }}>
