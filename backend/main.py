@@ -233,6 +233,13 @@ async def translate_websocket(ws: WebSocket):
                 dev_id = data.get("device_index")
                 if dev_id is not None:
                     config.audio.device_index = int(dev_id)
+                # 前端传入的模型配置
+                if data.get("api_key"):
+                    config.translator.openai_api_key = data["api_key"]
+                if data.get("api_base_url"):
+                    config.translator.openai_base_url = data["api_base_url"]
+                if data.get("model"):
+                    config.translator.model = data["model"]
                 pipeline = TranslationPipeline(ws)
                 await pipeline.start(req)
                 state.status = PipelineStatus.RUNNING
