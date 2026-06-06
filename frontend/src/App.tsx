@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useWebSocket, TranslationMessage } from "./hooks/useWebSocket";
 
 const WS = "ws://127.0.0.1:8765/ws/translate";
@@ -15,6 +15,7 @@ function ControlBall() {
   const [source, setSource] = useState("");
   const [translation, setTranslation] = useState("");
   const [showControls, setShowControls] = useState(true);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const onMsg = useCallback((msg: TranslationMessage) => {
     if (msg.type === "translation") {
@@ -41,13 +42,21 @@ function ControlBall() {
   const toggleSettings = () => {
     const next = !settings;
     setSettings(next);
-    window.electronAPI?.setHeight(next ? 360 : 220);
+    window.electronAPI?.setHeight(next ? 320 : 200);
   };
   const handleStart = () => send({ type: "start", device_index: deviceId ? Number(deviceId) : undefined });
   const handleStop = () => send({ type: "stop" });
 
   const hasTrans = translation && translation !== source;
   const q = !connected ? "#ef4444" : isRunning ? "#4ade80" : "#9ca3af";
+
+  // 自适应窗口高度
+  useEffect(() => {
+    if (!expanded || !isRunning) return;
+    const h = contentRef.current?.scrollHeight || 0;
+    const total = showControls ? h + 60 : h + 16;
+    window.electronAPI?.setHeight(Math.min(400, Math.max(120, total)));
+  }, [translation, source, showControls, isRunning, expanded]);
 
   if (!expanded) {
     return (
@@ -94,7 +103,7 @@ function ControlBall() {
       )}
 
       {isRunning && (
-        <div onDoubleClick={() => setShowControls(!showControls)} style={{
+        <div ref={contentRef} onDoubleClick={() => setShowControls(!showControls)} style={{
           marginTop: settings ? 0 : 8, padding: "8px 12px", borderRadius: 8,
           background: "rgba(255,255,255,0.04)", WebkitAppRegion: "no-drag",
           cursor: "pointer",
@@ -155,7 +164,7 @@ function DeviceSelect({ devices, deviceId, setDeviceId }: {
       {open && (
         <div style={{
           position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4,
-          maxHeight: 160, overflowY: "auto",
+          maxHeight: 100, overflowY: "scroll",
           background: "rgba(0,0,0,0.92)", backdropFilter: "blur(14px)",
           borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)",
           padding: 4, zIndex: 99,
