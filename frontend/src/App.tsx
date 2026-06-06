@@ -2,22 +2,19 @@ import { useState, useCallback, useEffect } from "react";
 import { useWebSocket, TranslationMessage } from "./hooks/useWebSocket";
 
 const WS = "ws://127.0.0.1:8765/ws/translate";
-const role = new URLSearchParams(location.search).get("role") || "control";
 
 export default function App() {
-  if (role === "subtitle") return <SubtitleWin />;
   return <ControlBall />;
 }
-
-// ── 控制球 ───────────────────────────────────
 
 function ControlBall() {
   const [expanded, setExpanded] = useState(false);
   const [settings, setSettings] = useState(false);
   const [devices, setDevices] = useState<{ id: number; name: string }[]>([]);
-  const [deviceId, setDeviceId] = useState<string>("");
+  const [deviceId, setDeviceId] = useState("");
   const [source, setSource] = useState("");
   const [translation, setTranslation] = useState("");
+  const [showControls, setShowControls] = useState(true);
 
   const onMsg = useCallback((msg: TranslationMessage) => {
     if (msg.type === "translation") {
@@ -27,28 +24,24 @@ function ControlBall() {
   }, []);
   const { connected, status, send, connect } = useWebSocket({ url: WS, onMessage: onMsg });
 
-  // 获取音频设备列表
   const fetchDevices = async () => {
     try {
       const res = await fetch("http://127.0.0.1:8765/api/devices");
-      const data = await res.json();
-      setDevices(data);
+      setDevices(await res.json());
     } catch {}
   };
-
   useEffect(() => { fetchDevices(); }, [connected]);
+
   const isRunning = status === "running";
-
-  // 运行中显示字幕窗
-  useEffect(() => {
-    if (isRunning) window.electronAPI?.showSubtitle();
-    else window.electronAPI?.hideSubtitle();
-  }, [isRunning]);
-
   const toggle = () => {
-    if (expanded) { window.electronAPI?.collapseControl(); }
-    else { window.electronAPI?.expandControl(); }
+    if (expanded) window.electronAPI?.collapseControl();
+    else window.electronAPI?.expandControl();
     setExpanded(!expanded); setSettings(false);
+  };
+  const toggleSettings = () => {
+    const next = !settings;
+    setSettings(next);
+    window.electronAPI?.setHeight(next ? 360 : 220);
   };
   const handleStart = () => send({ type: "start", device_index: deviceId ? Number(deviceId) : undefined });
   const handleStop = () => send({ type: "stop" });
@@ -56,22 +49,18 @@ function ControlBall() {
   const hasTrans = translation && translation !== source;
   const q = !connected ? "#ef4444" : isRunning ? "#4ade80" : "#9ca3af";
 
-  // 运行中弹字幕窗（Electron）或在浏览器嵌到下方
-  useEffect(() => {
-    if (isRunning) window.electronAPI?.showSubtitle();
-    else window.electronAPI?.hideSubtitle();
-  }, [isRunning]);
-
   if (!expanded) {
     return (
-      <div onClick={toggle} style={{
-        width: 44, height: 44, borderRadius: "50%",
-        background: "rgba(0,0,0,0.78)", backdropFilter: "blur(10px)",
-        border: `2px solid ${q}`, cursor: "pointer",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        userSelect: "none", WebkitAppRegion: "drag",
-      }}>
-        <span style={{ fontSize: 20, fontWeight: 700, color: q, userSelect: "none" }}>谛</span>
+      <div style={{ userSelect: "none", WebkitAppRegion: "drag" }}>
+        <div onClick={toggle} style={{
+          width: 44, height: 44, borderRadius: "50%",
+          background: "rgba(0,0,0,0.78)", backdropFilter: "blur(10px)",
+          border: `2px solid ${q}`, cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          userSelect: "none", WebkitAppRegion: "no-drag",
+        }}>
+          <span style={{ fontSize: 20, fontWeight: 700, color: q }}>谛</span>
+        </div>
       </div>
     );
   }
@@ -81,33 +70,34 @@ function ControlBall() {
       minHeight: "100%", padding: settings ? 12 : "0 12px",
       background: "rgba(0,0,0,0.78)", backdropFilter: settings ? "blur(14px)" : "blur(12px)",
       borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)",
-      fontSize: 13, color: "#fff", userSelect: "none", WebkitAppRegion: "drag",
-      display: "flex", flexDirection: "column",
+      fontSize: 13, color: "#fff", userSelect: "none",
+      display: "flex", flexDirection: "column", WebkitAppRegion: "drag",
     }}>
-      <div style={{
-        display: "flex", alignItems: "center", gap: 10,
-        height: settings ? 44 : "100%", minHeight: 44,
-      }}>
-        <span style={{ width: 6, height: 6, borderRadius: "50%", background: q, flexShrink: 0 }} />
-        <div style={{ display: "flex", gap: 5, flex: 1, WebkitAppRegion: "no-drag" }}>
-          <button onClick={isRunning ? handleStop : handleStart} disabled={!connected}
-            style={btn(isRunning ? "#374151" : q)}>
-            {isRunning ? "■" : "▶"}
-          </button>
-          <button onClick={() => setSettings(!settings)} style={btn(settings ? q : "#374151")}>⚙</button>
-        </div>
-        <span onClick={toggle} style={{
-          fontSize: 16, fontWeight: 700, color: "#9ca3af", cursor: "pointer",
-          WebkitAppRegion: "no-drag",
-        }}>−</span>
-      </div>
-
-      {/* 运行中字幕 */}
-      {isRunning && (
+      {showControls && (
         <div style={{
-          marginTop: settings ? 0 : 8, padding: "8px 12px",
-          borderRadius: 8, background: "rgba(255,255,255,0.04)",
-          WebkitAppRegion: "no-drag",
+          display: "flex", alignItems: "center", gap: 10,
+          height: 44, minHeight: 44,
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: q, flexShrink: 0 }} />
+          <div style={{ display: "flex", gap: 5, flex: 1, WebkitAppRegion: "no-drag" }}>
+            <button onClick={isRunning ? handleStop : handleStart} disabled={!connected}
+              style={btn(isRunning ? "#374151" : q)}>
+              {isRunning ? "■" : "▶"}
+            </button>
+            <button onClick={toggleSettings} style={btn(settings ? q : "#374151")}>⚙</button>
+          </div>
+          <span onClick={toggle} style={{
+            fontSize: 16, fontWeight: 700, color: "#9ca3af", cursor: "pointer",
+            WebkitAppRegion: "no-drag",
+          }}>−</span>
+        </div>
+      )}
+
+      {isRunning && (
+        <div onDoubleClick={() => setShowControls(!showControls)} style={{
+          marginTop: settings ? 0 : 8, padding: "8px 12px", borderRadius: 8,
+          background: "rgba(255,255,255,0.04)", WebkitAppRegion: "no-drag",
+          cursor: "pointer",
         }}>
           {hasTrans ? (
             <>
@@ -135,59 +125,6 @@ function ControlBall() {
             marginTop: 4, padding: "6px 0", border: "none", borderRadius: 6,
             background: "rgba(255,255,255,0.08)", color: "#fff", cursor: "pointer",
           }}>{connected ? "断开重连" : "连接"}</button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── 字幕窗 ───────────────────────────────────
-
-function SubtitleWin() {
-  const [source, setSource] = useState("");
-  const [translation, setTranslation] = useState("");
-
-  const onMsg = useCallback((msg: TranslationMessage) => {
-    if (msg.type === "translation") {
-      if (msg.payload.source_text) setSource(msg.payload.source_text);
-      if (msg.payload.translation) setTranslation(msg.payload.translation);
-    } else if (msg.type === "correction") {
-      setTranslation(msg.payload.new_translation || "");
-    }
-  }, []);
-
-  const { connected, status } = useWebSocket({ url: WS, onMessage: onMsg });
-  const isRunning = status === "running";
-  const hasTrans = translation && translation !== source;
-
-  return (
-    <div style={{
-      height: "100%", display: "flex", flexDirection: "column", justifyContent: "center",
-      padding: "8px 20px",
-      background: "rgba(0,0,0,0.7)", backdropFilter: "blur(12px)",
-      borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)",
-      color: "#fff", userSelect: "none", WebkitAppRegion: "drag",
-    }}>
-      {!connected ? (
-        <div style={{ color: "rgba(255,255,255,0.35)", textAlign: "center", fontSize: 14 }}>
-          未连接后端
-        </div>
-      ) : !isRunning ? (
-        <div style={{ color: "rgba(255,255,255,0.25)", textAlign: "center", fontSize: 14 }}>
-          休息中
-        </div>
-      ) : hasTrans ? (
-        <>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 4, textAlign: "center" }}>
-            {source}
-          </div>
-          <div style={{ fontSize: 20, fontWeight: 600, textAlign: "center", lineHeight: 1.4 }}>
-            {translation}
-          </div>
-        </>
-      ) : (
-        <div style={{ color: "rgba(255,255,255,0.3)", textAlign: "center", fontSize: 14 }}>
-          等待语音…
         </div>
       )}
     </div>
@@ -223,14 +160,10 @@ function DeviceSelect({ devices, deviceId, setDeviceId }: {
           borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)",
           padding: 4, zIndex: 99,
         }}>
-          <div onClick={() => { setDeviceId(""); setOpen(false); }} style={optStyle("自动", !deviceId)}>
-            自动
-          </div>
+          <div onClick={() => { setDeviceId(""); setOpen(false); }} style={optStyle("自动", !deviceId)}>自动</div>
           {devices.map((d) => (
             <div key={d.id} onClick={() => { setDeviceId(String(d.id)); setOpen(false); }}
-              style={optStyle(d.name, String(d.id) === deviceId)}>
-              {d.name}
-            </div>
+              style={optStyle(d.name, String(d.id) === deviceId)}>{d.name}</div>
           ))}
         </div>
       )}
