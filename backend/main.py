@@ -5,6 +5,7 @@ import logging
 
 import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 
 from config import config
 from models.schemas import (
@@ -25,7 +26,8 @@ from pipeline.translator import create_translator
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logger = logging.getLogger("diting")
-app = FastAPI(title="DitingVeritas", version="0.2.0")
+app = FastAPI(title="DitingVeritas", version="0.4.0")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
 class TranslationPipeline:
@@ -228,6 +230,9 @@ async def translate_websocket(ws: WebSocket):
                         ServerMessage.error(ErrorMessage(code="INVALID_PAYLOAD", message=str(e))).model_dump()
                     )
                     continue
+                dev_id = data.get("device_index")
+                if dev_id is not None:
+                    config.audio.device_index = int(dev_id)
                 pipeline = TranslationPipeline(ws)
                 await pipeline.start(req)
                 state.status = PipelineStatus.RUNNING
@@ -263,6 +268,12 @@ async def translate_websocket(ws: WebSocket):
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/devices")
+async def list_devices():
+    from pipeline.audio_capture import AudioCapture
+    return AudioCapture().list_devices()
 
 
 if __name__ == "__main__":
