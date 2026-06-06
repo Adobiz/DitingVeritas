@@ -12,10 +12,14 @@ function ControlBall() {
   const [settings, setSettings] = useState(false);
   const [devices, setDevices] = useState<{ id: number; name: string }[]>([]);
   const [deviceId, setDeviceId] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [apiBase, setApiBase] = useState("");
+  const [modelName, setModelName] = useState("");
   const [source, setSource] = useState("");
   const [translation, setTranslation] = useState("");
   const [showControls, setShowControls] = useState(true);
-  const contentRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const onMsg = useCallback((msg: TranslationMessage) => {
     if (msg.type === "translation") {
@@ -42,7 +46,7 @@ function ControlBall() {
   const toggleSettings = () => {
     const next = !settings;
     setSettings(next);
-    window.electronAPI?.setHeight(next ? 320 : 200);
+    window.electronAPI?.setHeight(next ? 340 : 200);
   };
   const handleStart = () => send({ type: "start", device_index: deviceId ? Number(deviceId) : undefined });
   const handleStop = () => send({ type: "stop" });
@@ -50,13 +54,23 @@ function ControlBall() {
   const hasTrans = translation && translation !== source;
   const q = !connected ? "#ef4444" : isRunning ? "#4ade80" : "#9ca3af";
 
-  // 自适应窗口高度
+  // 自适应窗口高度（设置打开时固定 340，否则跟随内容）
   useEffect(() => {
-    if (!expanded || !isRunning) return;
-    const h = contentRef.current?.scrollHeight || 0;
-    const total = showControls ? h + 60 : h + 16;
-    window.electronAPI?.setHeight(Math.min(400, Math.max(120, total)));
-  }, [translation, source, showControls, isRunning, expanded]);
+    if (!expanded) return;
+    if (settings) { window.electronAPI?.setHeight(340); return; }
+    if (!isRunning) { window.electronAPI?.setHeight(200); return; }
+    const el = panelRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        const h = el.scrollHeight;
+        window.electronAPI?.setHeight(Math.max(100, Math.min(h + 20, 400)));
+      }, 200);
+    });
+    ro.observe(el);
+    return () => { ro.disconnect(); clearTimeout(debounceRef.current); };
+  }, [expanded, settings, isRunning]);
 
   if (!expanded) {
     return (
@@ -75,8 +89,8 @@ function ControlBall() {
   }
 
   return (
-    <div style={{
-      minHeight: "100%", padding: settings ? 12 : "0 12px",
+    <div ref={panelRef} style={{
+      height: "auto", padding: settings ? 12 : "0 12px",
       background: "rgba(0,0,0,0.78)", backdropFilter: settings ? "blur(14px)" : "blur(12px)",
       borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)",
       fontSize: 13, color: "#fff", userSelect: "none",
@@ -103,7 +117,7 @@ function ControlBall() {
       )}
 
       {isRunning && (
-        <div ref={contentRef} onDoubleClick={() => setShowControls(!showControls)} style={{
+        <div onDoubleClick={() => setShowControls(!showControls)} style={{
           marginTop: settings ? 0 : 8, padding: "8px 12px", borderRadius: 8,
           background: "rgba(255,255,255,0.04)", WebkitAppRegion: "no-drag",
           cursor: "pointer",
@@ -129,7 +143,14 @@ function ControlBall() {
           <Row label="后端" value={WS} />
           <Row label="连接" value={connected ? "已连接" : "离线"} color={connected ? "#4ade80" : "#ef4444"} />
           <Row label="状态" value={isRunning ? "运行中" : "休息中"} />
-          <DeviceSelect devices={devices} deviceId={deviceId} setDeviceId={setDeviceId} />
+          <DeviceSelect devices={devices} deviceId={deviceId} setDeviceId={setDeviceId}
+            onOpen={() => {}} />
+          <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key" type="password"
+            style={inputStyle} />
+          <input value={apiBase} onChange={(e) => setApiBase(e.target.value)} placeholder="API Base URL"
+            style={inputStyle} />
+          <input value={modelName} onChange={(e) => setModelName(e.target.value)} placeholder="Model"
+            style={inputStyle} />
           <button onClick={connect} style={{
             marginTop: 4, padding: "6px 0", border: "none", borderRadius: 6,
             background: "rgba(255,255,255,0.08)", color: "#fff", cursor: "pointer",
@@ -140,17 +161,23 @@ function ControlBall() {
   );
 }
 
-function DeviceSelect({ devices, deviceId, setDeviceId }: {
+function DeviceSelect({ devices, deviceId, setDeviceId, onOpen }: {
   devices: { id: number; name: string }[];
   deviceId: string;
   setDeviceId: (v: string) => void;
+  onOpen: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const toggle = () => {
+    if (!open) { onOpen(true); setTimeout(() => setOpen(true), 150); }
+    else { setOpen(false); onOpen(false); }
+  };
+  const close = () => { setOpen(false); onOpen(false); };
   const current = devices.find((d) => String(d.id) === deviceId);
 
   return (
     <div style={{ position: "relative", WebkitAppRegion: "no-drag" }}>
-      <div onClick={() => setOpen(!open)} style={{
+      <div onClick={toggle} style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
         padding: "4px 8px", borderRadius: 6, cursor: "pointer",
         background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
@@ -164,14 +191,14 @@ function DeviceSelect({ devices, deviceId, setDeviceId }: {
       {open && (
         <div style={{
           position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4,
-          maxHeight: 100, overflowY: "scroll",
+          maxHeight: 120, overflowY: "auto",
           background: "rgba(0,0,0,0.92)", backdropFilter: "blur(14px)",
           borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)",
           padding: 4, zIndex: 99,
         }}>
-          <div onClick={() => { setDeviceId(""); setOpen(false); }} style={optStyle("自动", !deviceId)}>自动</div>
+          <div onClick={() => { setDeviceId(""); close(); }} style={optStyle("自动", !deviceId)}>自动</div>
           {devices.map((d) => (
-            <div key={d.id} onClick={() => { setDeviceId(String(d.id)); setOpen(false); }}
+            <div key={d.id} onClick={() => { setDeviceId(String(d.id)); close(); }}
               style={optStyle(d.name, String(d.id) === deviceId)}>{d.name}</div>
           ))}
         </div>
@@ -193,6 +220,12 @@ const Row = ({ label, value, color }: { label: string; value: string; color?: st
     <span style={{ color: color || "rgba(255,255,255,0.7)" }}>{value}</span>
   </div>
 );
+
+const inputStyle: React.CSSProperties = {
+  padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)",
+  background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 11,
+  outline: "none", width: "100%",
+};
 
 const btn = (bg: string): React.CSSProperties => ({
   width: 32, height: 32, border: "none", borderRadius: 8,
