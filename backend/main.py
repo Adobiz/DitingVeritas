@@ -130,7 +130,8 @@ class TranslationPipeline:
                 logger.info(f"ASR: {text[:80]}")
 
                 translation = await self._translator.translate_async(text)
-                logger.info(f"翻译: {translation[:50]}")
+                if translation and translation != text:
+                    logger.info(f"翻译: {translation[:50]}")
 
                 await self._send(ServerMessage.translation(
                     TranslationResult(source_text=text, translation=translation, is_partial=False)
