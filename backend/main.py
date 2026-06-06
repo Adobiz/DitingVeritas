@@ -132,6 +132,8 @@ class TranslationPipeline:
                 translation = await self._translator.translate_async(text)
                 if translation != text:
                     logger.info(f"翻译: {translation[:50]}")
+                else:
+                    logger.warning("翻译回退原文，请检查 API key 或网络")
 
                 await self._send(ServerMessage.translation(
                     TranslationResult(source_text=text, translation=translation, is_partial=False)
