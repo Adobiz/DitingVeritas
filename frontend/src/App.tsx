@@ -58,6 +58,12 @@ function ControlBall() {
       model: m?.model, api_key: m?.key, api_base_url: m?.url });
   };
   const handleStop = () => send({ type: "stop" });
+  const handleDeleteModel = (id: string) => {
+    const next = models.filter((m) => m.id !== id);
+    setModels(next);
+    if (selectedModel === id) setSelectedModel("");
+    localStorage.setItem("dv_models", JSON.stringify(next));
+  };
 
   const hasTrans = translation && translation !== source;
   const q = !connected ? "#ef4444" : isRunning ? "#4ade80" : "#9ca3af";
@@ -162,7 +168,7 @@ function ControlBall() {
             <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, flexShrink: 0 }}>选择模型</span>
             {models.length > 0 && (
               <ModelSelect models={models} selected={selectedModel} onSelect={setSelectedModel}
-                disabled={isRunning} />
+                onDelete={handleDeleteModel} disabled={isRunning} />
             )}
             <button onClick={() => { if (isRunning) return; setShowAddModel(!showAddModel); }}
               disabled={isRunning} title={isRunning ? "运行中不可添加" : ""}
@@ -195,8 +201,9 @@ function ControlBall() {
   );
 }
 
-function ModelSelect({ models, selected, onSelect, disabled }: {
-  models: { id: string; label: string }[]; selected: string; onSelect: (id: string) => void; disabled?: boolean;
+function ModelSelect({ models, selected, onSelect, onDelete, disabled }: {
+  models: { id: string; label: string }[]; selected: string; onSelect: (id: string) => void;
+  onDelete: (id: string) => void; disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const cur = models.find((m) => m.id === selected);
@@ -222,8 +229,15 @@ function ModelSelect({ models, selected, onSelect, disabled }: {
           padding: 4, zIndex: 99,
         }}>
           {models.map((m) => (
-            <div key={m.id} onClick={() => { onSelect(m.id); setOpen(false); }}
-              style={optStyle(m.label, m.id === selected)}>{m.label}</div>
+            <div key={m.id} style={{ display: "flex", alignItems: "center", ...optStyle(m.label, m.id === selected) }}>
+              <div onClick={() => { onSelect(m.id); setOpen(false); }} style={{ flex: 1 }}>
+                {m.label}
+              </div>
+              <span onClick={(e) => { e.stopPropagation(); onDelete(m.id); }} style={{
+                marginLeft: 6, cursor: "pointer", color: "rgba(255,255,255,0.3)",
+                fontSize: 14, lineHeight: 1,
+              }} title="删除">×</span>
+            </div>
           ))}
         </div>
       )}
