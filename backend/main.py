@@ -130,7 +130,10 @@ class TranslationPipeline:
                 logger.info(f"ASR: {text[:80]}")
 
                 translation = await self._translator.translate_async(text)
-                if translation and translation != text:
+                if translation == text:  # 翻译失败回退 → 清空以示区分
+                    logger.warning("翻译回退原文")
+                    translation = ""
+                else:
                     logger.info(f"翻译: {translation[:50]}")
 
                 await self._send(ServerMessage.translation(
