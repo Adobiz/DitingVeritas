@@ -130,6 +130,8 @@ function ControlBall() {
               style={{ ...btn(!showControls && isRunning ? q : "#374151"), opacity: isRunning ? 1 : 0.3 }}>▤</button>
             <button onClick={toggleSettings} style={btn(settings ? q : "#374151")}>⚙</button>
           </div>
+          <span style={{ fontSize: 14, color: "rgba(255,255,255,0.25)", cursor: "grab", WebkitAppRegion: "drag",
+            userSelect: "none", padding: "0 4px" }} title="拖拽移动">⠿</span>
           <span onClick={toggle} style={{
             fontSize: 16, fontWeight: 700, color: "#9ca3af", cursor: "pointer",
             WebkitAppRegion: "no-drag",
