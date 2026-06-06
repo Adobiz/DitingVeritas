@@ -8,7 +8,7 @@ load_dotenv()
 
 @dataclass
 class AudioConfig:
-    sample_rate: int = 44100  # WASAPI 设备原生率，内部重采样到 16kHz
+    sample_rate: int | None = None  # None=自动检测设备原生率，非None=强制
     channels: int = 1
     block_size: int = 1024
     device_index: int | None = None
@@ -36,9 +36,9 @@ class ASRConfig:
 @dataclass
 class TranslatorConfig:
     provider: str = field(default_factory=lambda: os.getenv("TRANSLATOR_PROVIDER", "auto"))
-    model: str = "claude-sonnet-4-6"
+    model: str = field(default_factory=lambda: os.getenv("TRANSLATOR_MODEL", "auto"))
     temperature: float = 0.3
-    max_tokens: int = 1024
+    max_tokens: int = 256
     system_prompt: str = field(
         default="你是同声传译专家。将英文翻译成简洁中文。只输出译文。"
     )

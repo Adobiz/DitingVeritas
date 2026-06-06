@@ -24,6 +24,9 @@ class ClaudeTranslator(TranslatorBackend):
 
     def __init__(self):
         self._client = None
+        self._model = config.translator.model
+        if self._model == "auto":
+            self._model = "claude-sonnet-4-6"
         if config.translator.anthropic_api_key:
             try:
                 from anthropic import Anthropic
@@ -39,7 +42,7 @@ class ClaudeTranslator(TranslatorBackend):
             return text
         try:
             resp = self._client.messages.create(
-                model=config.translator.model,
+                model=self._model,
                 max_tokens=config.translator.max_tokens,
                 temperature=config.translator.temperature,
                 system=config.translator.system_prompt,
@@ -57,6 +60,8 @@ class OpenAITranslator(TranslatorBackend):
     def __init__(self):
         self._client = None
         self._model = config.translator.model
+        if self._model == "auto":
+            self._model = "gpt-4o-mini"
         api_key = config.translator.openai_api_key
         base_url = config.translator.openai_base_url
         if api_key:

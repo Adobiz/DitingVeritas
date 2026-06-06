@@ -116,9 +116,12 @@ class TranslationPipeline:
                 continue
 
             for seg in segments:
+                audio = seg.get("audio")
+                if audio is None or len(audio) == 0:
+                    continue
                 # ASR（线程池异步执行）
                 try:
-                    results = await loop.run_in_executor(None, self._asr.transcribe, seg["audio"])
+                    results = await loop.run_in_executor(None, self._asr.transcribe, audio)
                 except Exception as e:
                     logger.error(f"ASR 异常: {e}")
                     continue

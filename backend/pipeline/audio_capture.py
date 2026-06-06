@@ -47,9 +47,8 @@ class AudioCapture:
         self._running = False
         self._error: str | None = None
         self._device = config.audio.device_index or _find_loopback_device()
-        # 查询设备实际采样率
-        dev_info = sd.query_devices(self._device)
-        self._sample_rate = int(dev_info["default_samplerate"])
+        self._sample_rate = config.audio.sample_rate or \
+            int(sd.query_devices(self._device)["default_samplerate"])
 
     @property
     def running(self) -> bool:
@@ -95,7 +94,7 @@ class AudioCapture:
                 if errors >= max_errors:
                     self._error = f"回调连续异常 {errors} 次，已熔断"
                     logger.critical(self._error)
-                    self.stop()
+                    raise sd.CallbackAbort()
 
         try:
             self._stream = sd.InputStream(

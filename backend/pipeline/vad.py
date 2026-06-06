@@ -61,6 +61,7 @@ class VoiceActivityDetector:
             if self._speaking:
                 if self._speech_start_sample < overflow:
                     self._speaking = False
+                    self._speech_start_sample = 0
                     self._silence_start_sample = None
                 else:
                     self._speech_start_sample -= overflow
