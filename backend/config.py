@@ -56,6 +56,9 @@ class Config:
     asr: ASRConfig = field(default_factory=ASRConfig)
     translator: TranslatorConfig = field(default_factory=TranslatorConfig)
     context: ContextConfig = field(default_factory=ContextConfig)
+    translator_provider: str = field(
+        default_factory=lambda: os.getenv("TRANSLATOR_PROVIDER", "auto")
+    )
     anthropic_api_key: str = field(
         default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", "")
     )
