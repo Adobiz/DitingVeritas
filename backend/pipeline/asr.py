@@ -33,8 +33,8 @@ class ASREngine:
         if audio.ndim > 1:
             audio = audio[:, 0]  # 多声道 → 第一通道
         peak = np.abs(audio).max()
-        if peak > 0:
-            audio = audio / peak        # 峰值归一化
+        if peak > 0.01:                 # > -40dB 才归一化，避免放大噪声
+            audio = audio / peak
         audio = np.clip(audio, -1.0, 1.0)
 
         if len(audio) < 1600:           # <100ms @16kHz 跳过
