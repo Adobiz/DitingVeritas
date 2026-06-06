@@ -35,12 +35,16 @@ class ASRConfig:
 
 @dataclass
 class TranslatorConfig:
+    provider: str = field(default_factory=lambda: os.getenv("TRANSLATOR_PROVIDER", "auto"))
     model: str = "claude-sonnet-4-6"
     temperature: float = 0.3
     max_tokens: int = 1024
     system_prompt: str = field(
         default="你是同声传译专家。将英文翻译成简洁中文。只输出译文。"
     )
+    openai_api_key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
+    openai_base_url: str = field(default_factory=lambda: os.getenv("OPENAI_BASE_URL", ""))
+    anthropic_api_key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
 
 
 @dataclass
@@ -56,9 +60,6 @@ class Config:
     asr: ASRConfig = field(default_factory=ASRConfig)
     translator: TranslatorConfig = field(default_factory=TranslatorConfig)
     context: ContextConfig = field(default_factory=ContextConfig)
-    anthropic_api_key: str = field(
-        default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", "")
-    )
 
 
 config = Config()

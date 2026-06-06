@@ -6,6 +6,7 @@ numpy==2.2.1
 silero-vad==5.1
 faster-whisper==1.1.1
 anthropic==0.42.0
+openai>=1.0.0
 httpx==0.28.1
 pydantic==2.10.4
 python-dotenv==1.0.1
