@@ -24,10 +24,10 @@ class ClaudeTranslator(TranslatorBackend):
 
     def __init__(self):
         self._client = None
-        if config.anthropic_api_key:
+        if config.translator.anthropic_api_key:
             try:
                 from anthropic import Anthropic
-                self._client = Anthropic(api_key=config.anthropic_api_key)
+                self._client = Anthropic(api_key=config.translator.anthropic_api_key)
                 logger.info("Claude 翻译就绪")
             except ImportError:
                 logger.error("未安装 anthropic SDK")
@@ -55,11 +55,10 @@ class OpenAITranslator(TranslatorBackend):
     """OpenAI 兼容 API 英→中（支持任意 OpenAI 兼容接口）"""
 
     def __init__(self):
-        import os
         self._client = None
         self._model = config.translator.model
-        api_key = os.getenv("OPENAI_API_KEY", "")
-        base_url = os.getenv("OPENAI_BASE_URL", "")
+        api_key = config.translator.openai_api_key
+        base_url = config.translator.openai_base_url
         if api_key:
             try:
                 from openai import OpenAI
@@ -94,16 +93,15 @@ class OpenAITranslator(TranslatorBackend):
 
 def create_translator(provider: str = "") -> TranslatorBackend:
     """工厂：按配置或自动检测可用 API key"""
-    import os
-    provider = provider or getattr(config, "translator_provider", "auto")
+    provider = provider or config.translator.provider
     if provider == "claude":
         return ClaudeTranslator()
     if provider == "openai":
         return OpenAITranslator()
     # auto: 检测哪个 key 可用
-    if os.getenv("OPENAI_API_KEY"):
+    if config.translator.openai_api_key:
         return OpenAITranslator()
-    if config.anthropic_api_key:
+    if config.translator.anthropic_api_key:
         return ClaudeTranslator()
     logger.warning("未配置翻译 API key，将回退原文")
-    return ClaudeTranslator()  # 无 key 时 Claude 内部回退
+    return ClaudeTranslator()
