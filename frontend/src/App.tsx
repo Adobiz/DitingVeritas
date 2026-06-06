@@ -12,9 +12,13 @@ function ControlBall() {
   const [settings, setSettings] = useState(false);
   const [devices, setDevices] = useState<{ id: number; name: string }[]>([]);
   const [deviceId, setDeviceId] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [apiBase, setApiBase] = useState("");
-  const [modelName, setModelName] = useState("");
+  const [models, setModels] = useState<{ id: string; label: string; key: string; url: string; model: string }[]>(
+    () => { try { return JSON.parse(localStorage.getItem("dv_models") || "[]"); } catch { return []; } }
+  );
+  const [selectedModel, setSelectedModel] = useState("");
+  const [modelHint, setModelHint] = useState(false);  // 运行中改模型提示
+  const [showAddModel, setShowAddModel] = useState(false);
+  const [toast, setToast] = useState("");
   const [source, setSource] = useState("");
   const [translation, setTranslation] = useState("");
   const [showControls, setShowControls] = useState(true);
@@ -46,31 +50,45 @@ function ControlBall() {
   const toggleSettings = () => {
     const next = !settings;
     setSettings(next);
-    window.electronAPI?.setHeight(next ? 340 : 200);
+    window.electronAPI?.setHeight(next ? 440 : 200);
   };
-  const handleStart = () => send({ type: "start", device_index: deviceId ? Number(deviceId) : undefined });
+  const handleStart = () => {
+    const m = models.find((m) => m.id === selectedModel);
+    send({ type: "start", device_index: deviceId ? Number(deviceId) : undefined,
+      model: m?.model, api_key: m?.key, api_base_url: m?.url });
+  };
   const handleStop = () => send({ type: "stop" });
+  const handleDeleteModel = (id: string) => {
+    const next = models.filter((m) => m.id !== id);
+    setModels(next);
+    if (selectedModel === id) setSelectedModel("");
+    localStorage.setItem("dv_models", JSON.stringify(next));
+  };
 
   const hasTrans = translation && translation !== source;
   const q = !connected ? "#ef4444" : isRunning ? "#4ade80" : "#9ca3af";
 
-  // 自适应窗口高度（设置打开时固定 340，否则跟随内容）
+  // 自适应窗口高度
   useEffect(() => {
     if (!expanded) return;
-    if (settings) { window.electronAPI?.setHeight(340); return; }
+
+    if (settings) { window.electronAPI?.setHeight(showAddModel ? 560 : 460); return; }
+    if (!isRunning && !showControls) { window.electronAPI?.setHeight(80); return; }
     if (!isRunning) { window.electronAPI?.setHeight(200); return; }
+
     const el = panelRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
       clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         const h = el.scrollHeight;
-        window.electronAPI?.setHeight(Math.max(100, Math.min(h + 20, 400)));
+        const min = showControls ? 120 : 100;
+        window.electronAPI?.setHeight(Math.max(min, Math.min(h + 20, 400)));
       }, 200);
     });
     ro.observe(el);
     return () => { ro.disconnect(); clearTimeout(debounceRef.current); };
-  }, [expanded, settings, isRunning]);
+  }, [expanded, settings, isRunning, showAddModel, showControls]);
 
   if (!expanded) {
     return (
@@ -90,7 +108,7 @@ function ControlBall() {
 
   return (
     <div ref={panelRef} style={{
-      height: "auto", padding: settings ? 12 : "0 12px",
+      height: "auto", minHeight: showControls ? "auto" : 80, padding: settings ? 12 : "0 12px",
       background: "rgba(0,0,0,0.78)", backdropFilter: settings ? "blur(14px)" : "blur(12px)",
       borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)",
       fontSize: 13, color: "#fff", userSelect: "none",
@@ -107,8 +125,13 @@ function ControlBall() {
               style={btn(isRunning ? "#374151" : q)}>
               {isRunning ? "■" : "▶"}
             </button>
+            <button onClick={() => { if (!isRunning) return; setShowControls(!showControls); setSettings(false); }}
+              disabled={!isRunning} title={isRunning ? "字幕模式" : "启动后可切换"}
+              style={{ ...btn(!showControls && isRunning ? q : "#374151"), opacity: isRunning ? 1 : 0.3 }}>▤</button>
             <button onClick={toggleSettings} style={btn(settings ? q : "#374151")}>⚙</button>
           </div>
+          <span style={{ fontSize: 14, color: "rgba(255,255,255,0.25)", cursor: "grab", WebkitAppRegion: "drag",
+            userSelect: "none", padding: "0 4px" }} title="拖拽移动">⠿</span>
           <span onClick={toggle} style={{
             fontSize: 16, fontWeight: 700, color: "#9ca3af", cursor: "pointer",
             WebkitAppRegion: "no-drag",
@@ -118,7 +141,8 @@ function ControlBall() {
 
       {isRunning && (
         <div onDoubleClick={() => setShowControls(!showControls)} style={{
-          marginTop: settings ? 0 : 8, padding: "8px 12px", borderRadius: 8,
+          flex: 1, display: "flex", flexDirection: "column", justifyContent: "center",
+          padding: "12px 16px", borderRadius: 8, margin: 0,
           background: "rgba(255,255,255,0.04)", WebkitAppRegion: "no-drag",
           cursor: "pointer",
         }}>
@@ -143,14 +167,40 @@ function ControlBall() {
           <Row label="后端" value={WS} />
           <Row label="连接" value={connected ? "已连接" : "离线"} color={connected ? "#4ade80" : "#ef4444"} />
           <Row label="状态" value={isRunning ? "运行中" : "休息中"} />
-          <DeviceSelect devices={devices} deviceId={deviceId} setDeviceId={setDeviceId}
-            onOpen={() => {}} />
-          <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key" type="password"
-            style={inputStyle} />
-          <input value={apiBase} onChange={(e) => setApiBase(e.target.value)} placeholder="API Base URL"
-            style={inputStyle} />
-          <input value={modelName} onChange={(e) => setModelName(e.target.value)} placeholder="Model"
-            style={inputStyle} />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+            <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, flexShrink: 0 }}>音频源</span>
+            <DeviceSelect devices={devices} deviceId={deviceId} setDeviceId={setDeviceId}
+              onOpen={() => {}} disabled={isRunning} />
+          </div>
+
+          {/* 模型选择 */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+            <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, flexShrink: 0 }}>选择模型</span>
+            {models.length > 0 && (
+              <ModelSelect models={models} selected={selectedModel} onSelect={setSelectedModel}
+                onDelete={handleDeleteModel} disabled={isRunning} />
+            )}
+            <button onClick={() => { if (isRunning) return; setShowAddModel(!showAddModel); }}
+              disabled={isRunning} title={isRunning ? "运行中不可添加" : ""}
+              style={{
+              ...btn("#374151"), width: 22, height: 22, fontSize: 16, borderRadius: 4, flexShrink: 0,
+              opacity: isRunning ? 0.4 : 1,
+            }}>+</button>
+          </div>
+
+          {/* 添加模型表单 */}
+          {showAddModel && <AddModelForm onAdd={(m) => {
+            const next = [...models, m];
+            setModels(next); setSelectedModel(m.id);
+            localStorage.setItem("dv_models", JSON.stringify(next));
+            setShowAddModel(false); setToast("已添加");
+            setTimeout(() => setToast(""), 2000);
+          }} />}
+
+          {toast && (
+            <div style={{ color: "#4ade80", fontSize: 11, textAlign: "center" }}>{toast}</div>
+          )}
+
           <button onClick={connect} style={{
             marginTop: 4, padding: "6px 0", border: "none", borderRadius: 6,
             background: "rgba(255,255,255,0.08)", color: "#fff", cursor: "pointer",
@@ -161,14 +211,58 @@ function ControlBall() {
   );
 }
 
-function DeviceSelect({ devices, deviceId, setDeviceId, onOpen }: {
+function ModelSelect({ models, selected, onSelect, onDelete, disabled }: {
+  models: { id: string; label: string }[]; selected: string; onSelect: (id: string) => void;
+  onDelete: (id: string) => void; disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const cur = models.find((m) => m.id === selected);
+  return (
+    <div style={{ position: "relative", WebkitAppRegion: "no-drag", flex: 1 }}>
+      <div onClick={() => { if (disabled) return; setOpen(!open); }} style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        padding: "3px 6px", borderRadius: 6,
+        background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+        fontSize: 11, color: "rgba(255,255,255,0.7)", width: "100%", opacity: disabled ? 0.4 : 1, cursor: disabled ? "not-allowed" : "pointer",
+      }}>
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+          {cur?.label || "选择模型"}
+        </span>
+        <span style={{ fontSize: 8, marginLeft: 4 }}>▼</span>
+      </div>
+      {open && (
+        <div style={{
+          position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4,
+          maxHeight: 100, overflowY: "auto", scrollbarWidth: "none",
+          background: "rgba(0,0,0,0.92)", backdropFilter: "blur(14px)",
+          borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)",
+          padding: 4, zIndex: 99,
+        }}>
+          {models.map((m) => (
+            <div key={m.id} style={{ display: "flex", alignItems: "center", ...optStyle(m.label, m.id === selected) }}>
+              <div onClick={() => { onSelect(m.id); setOpen(false); }} style={{ flex: 1 }}>
+                {m.label}
+              </div>
+              <span onClick={(e) => { e.stopPropagation(); onDelete(m.id); }} style={{
+                marginLeft: 6, cursor: "pointer", color: "rgba(255,255,255,0.3)",
+                fontSize: 14, lineHeight: 1,
+              }} title="删除">×</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DeviceSelect({ devices, deviceId, setDeviceId, onOpen, disabled }: {
   devices: { id: number; name: string }[];
   deviceId: string;
   setDeviceId: (v: string) => void;
-  onOpen: (open: boolean) => void;
+  onOpen: (open: boolean) => void; disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const toggle = () => {
+  const toggle = () => { if (disabled) return;
     if (!open) { onOpen(true); setTimeout(() => setOpen(true), 150); }
     else { setOpen(false); onOpen(false); }
   };
@@ -176,14 +270,14 @@ function DeviceSelect({ devices, deviceId, setDeviceId, onOpen }: {
   const current = devices.find((d) => String(d.id) === deviceId);
 
   return (
-    <div style={{ position: "relative", WebkitAppRegion: "no-drag" }}>
+    <div style={{ position: "relative", WebkitAppRegion: "no-drag", flex: 1 }}>
       <div onClick={toggle} style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "4px 8px", borderRadius: 6, cursor: "pointer",
+        padding: "3px 6px", borderRadius: 6,
         background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-        fontSize: 11, color: "rgba(255,255,255,0.7)",
+        fontSize: 11, color: "rgba(255,255,255,0.7)", width: "100%", opacity: disabled ? 0.4 : 1, cursor: disabled ? "not-allowed" : "pointer",
       }}>
-        <span style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
           {current?.name || "自动"}
         </span>
         <span style={{ fontSize: 8, marginLeft: 4 }}>▼</span>
@@ -191,7 +285,7 @@ function DeviceSelect({ devices, deviceId, setDeviceId, onOpen }: {
       {open && (
         <div style={{
           position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4,
-          maxHeight: 120, overflowY: "auto",
+          maxHeight: 100, overflowY: "auto", scrollbarWidth: "none",
           background: "rgba(0,0,0,0.92)", backdropFilter: "blur(14px)",
           borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)",
           padding: 4, zIndex: 99,
@@ -226,6 +320,31 @@ const inputStyle: React.CSSProperties = {
   background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 11,
   outline: "none", width: "100%",
 };
+
+function AddModelForm({ onAdd }: { onAdd: (m: { id: string; label: string; key: string; url: string; model: string }) => void }) {
+  const [label, setLabel] = useState("");
+  const [key, setKey] = useState("");
+  const [url, setUrl] = useState("");
+  const [model, setModel] = useState("");
+
+  const submit = () => {
+    if (!label || !key) return;
+    onAdd({ id: Date.now().toString(36), label, key, url, model });
+  };
+
+  return (
+    <div style={{ padding: 8, borderRadius: 6, background: "rgba(255,255,255,0.03)" }}>
+      <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="名称 (如 DeepSeek)" style={inputStyle} />
+      <input value={key} onChange={(e) => setKey(e.target.value)} placeholder="API Key" type="password" style={inputStyle} />
+      <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="API Base URL (可选)" style={inputStyle} />
+      <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="Model (可选)" style={inputStyle} />
+      <button onClick={submit} style={{
+        width: "100%", padding: "5px 0", border: "none", borderRadius: 6,
+        background: "#4ade80", color: "#000", fontWeight: 600, fontSize: 12, cursor: "pointer",
+      }}>添加</button>
+    </div>
+  );
+}
 
 const btn = (bg: string): React.CSSProperties => ({
   width: 32, height: 32, border: "none", borderRadius: 8,
