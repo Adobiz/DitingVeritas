@@ -65,7 +65,7 @@ function ControlBall() {
   // 自适应窗口高度（设置打开时固定 340，否则跟随内容）
   useEffect(() => {
     if (!expanded) return;
-    if (settings) { window.electronAPI?.setHeight(460); return; }
+    if (settings) { window.electronAPI?.setHeight(showAddModel ? 560 : 460); return; }
     if (!isRunning) { window.electronAPI?.setHeight(200); return; }
     const el = panelRef.current;
     if (!el) return;
@@ -78,7 +78,7 @@ function ControlBall() {
     });
     ro.observe(el);
     return () => { ro.disconnect(); clearTimeout(debounceRef.current); };
-  }, [expanded, settings, isRunning]);
+  }, [expanded, settings, isRunning, showAddModel]);
 
   if (!expanded) {
     return (
@@ -154,17 +154,21 @@ function ControlBall() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
             <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, flexShrink: 0 }}>音频源</span>
             <DeviceSelect devices={devices} deviceId={deviceId} setDeviceId={setDeviceId}
-              onOpen={() => {}} />
+              onOpen={() => {}} disabled={isRunning} />
           </div>
 
           {/* 模型选择 */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
             <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, flexShrink: 0 }}>选择模型</span>
             {models.length > 0 && (
-              <ModelSelect models={models} selected={selectedModel} onSelect={setSelectedModel} />
+              <ModelSelect models={models} selected={selectedModel} onSelect={setSelectedModel}
+                disabled={isRunning} />
             )}
-            <button onClick={() => setShowAddModel(!showAddModel)} style={{
+            <button onClick={() => { if (isRunning) return; setShowAddModel(!showAddModel); }}
+              disabled={isRunning} title={isRunning ? "运行中不可添加" : ""}
+              style={{
               ...btn("#374151"), width: 22, height: 22, fontSize: 16, borderRadius: 4, flexShrink: 0,
+              opacity: isRunning ? 0.4 : 1,
             }}>+</button>
           </div>
 
@@ -191,18 +195,18 @@ function ControlBall() {
   );
 }
 
-function ModelSelect({ models, selected, onSelect }: {
-  models: { id: string; label: string }[]; selected: string; onSelect: (id: string) => void;
+function ModelSelect({ models, selected, onSelect, disabled }: {
+  models: { id: string; label: string }[]; selected: string; onSelect: (id: string) => void; disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const cur = models.find((m) => m.id === selected);
   return (
     <div style={{ position: "relative", WebkitAppRegion: "no-drag", flex: 1 }}>
-      <div onClick={() => setOpen(!open)} style={{
+      <div onClick={() => { if (disabled) return; setOpen(!open); }} style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "3px 6px", borderRadius: 6, cursor: "pointer",
+        padding: "3px 6px", borderRadius: 6,
         background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-        fontSize: 11, color: "rgba(255,255,255,0.7)", width: "100%",
+        fontSize: 11, color: "rgba(255,255,255,0.7)", width: "100%", opacity: disabled ? 0.4 : 1, cursor: disabled ? "not-allowed" : "pointer",
       }}>
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
           {cur?.label || "选择模型"}
@@ -227,14 +231,14 @@ function ModelSelect({ models, selected, onSelect }: {
   );
 }
 
-function DeviceSelect({ devices, deviceId, setDeviceId, onOpen }: {
+function DeviceSelect({ devices, deviceId, setDeviceId, onOpen, disabled }: {
   devices: { id: number; name: string }[];
   deviceId: string;
   setDeviceId: (v: string) => void;
-  onOpen: (open: boolean) => void;
+  onOpen: (open: boolean) => void; disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const toggle = () => {
+  const toggle = () => { if (disabled) return;
     if (!open) { onOpen(true); setTimeout(() => setOpen(true), 150); }
     else { setOpen(false); onOpen(false); }
   };
@@ -245,9 +249,9 @@ function DeviceSelect({ devices, deviceId, setDeviceId, onOpen }: {
     <div style={{ position: "relative", WebkitAppRegion: "no-drag", flex: 1 }}>
       <div onClick={toggle} style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "3px 6px", borderRadius: 6, cursor: "pointer",
+        padding: "3px 6px", borderRadius: 6,
         background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-        fontSize: 11, color: "rgba(255,255,255,0.7)", width: "100%",
+        fontSize: 11, color: "rgba(255,255,255,0.7)", width: "100%", opacity: disabled ? 0.4 : 1, cursor: disabled ? "not-allowed" : "pointer",
       }}>
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
           {current?.name || "自动"}
