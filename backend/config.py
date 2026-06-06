@@ -8,7 +8,7 @@ load_dotenv()
 
 @dataclass
 class AudioConfig:
-    sample_rate: int = 16000
+    sample_rate: int = 44100  # WASAPI 设备原生率，内部重采样到 16kHz
     channels: int = 1
     block_size: int = 1024
     device_index: int | None = None
@@ -18,9 +18,9 @@ class AudioConfig:
 @dataclass
 class VADConfig:
     threshold: float = 0.5
-    min_speech_duration_ms: int = 200
-    min_silence_duration_ms: int = 300
-    speech_pad_ms: int = 100
+    min_speech_duration_ms: int = 400   # 低于此忽略
+    min_silence_duration_ms: int = 500  # 句间静音阈值（防碎片化）
+    speech_pad_ms: int = 200
     sample_rate: int = 16000
 
 
