@@ -223,7 +223,7 @@ function ModelSelect({ models, selected, onSelect, onDelete, disabled }: {
       {open && (
         <div style={{
           position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4,
-          maxHeight: 100, overflowY: "auto",
+          maxHeight: 100, overflowY: "auto", scrollbarWidth: "none",
           background: "rgba(0,0,0,0.92)", backdropFilter: "blur(14px)",
           borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)",
           padding: 4, zIndex: 99,
@@ -275,7 +275,7 @@ function DeviceSelect({ devices, deviceId, setDeviceId, onOpen, disabled }: {
       {open && (
         <div style={{
           position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4,
-          maxHeight: 100, overflowY: "auto",
+          maxHeight: 100, overflowY: "auto", scrollbarWidth: "none",
           background: "rgba(0,0,0,0.92)", backdropFilter: "blur(14px)",
           borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)",
           padding: 4, zIndex: 99,
