@@ -96,9 +96,9 @@ function ControlBall() {
 
   if (!expanded) {
     return (
-      <div style={{ userSelect: "none", WebkitAppRegion: "drag" }}>
-        <div onClick={toggle} style={{ width: 44, height: 44, borderRadius: "50%", background: bg(1), backdropFilter: "blur(10px)", border: `2px solid ${q}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", userSelect: "none", WebkitAppRegion: "no-drag" }}>
-          <span style={{ fontSize: 20, fontWeight: 700, color: q }}>谛</span>
+      <div style={{ width: "100%", height: "100%", userSelect: "none", WebkitAppRegion: "drag" }}>
+        <div onClick={toggle} style={{ width: 44, height: 44, borderRadius: "50%", background: bg(1), backdropFilter: "blur(10px)", border: `4px solid ${q}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", userSelect: "none", WebkitAppRegion: "no-drag", boxSizing: "border-box" }}>
+          <span style={{ fontSize: 20, fontWeight: 700, color: q, pointerEvents: "none" }}>谛</span>
         </div>
       </div>
     );
