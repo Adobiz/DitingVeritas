@@ -17,7 +17,7 @@ function ControlBall() {
   const [theme, setTheme] = useState(() => ({ primaryColor: "#9ca3af", bgOpacity: 0.78, brightness: 1.0, ...loadTheme() }));
   const [devices, setDevices] = useState<{ id: number; name: string }[]>([]);
   const [deviceId, setDeviceId] = useState("");
-  const [models, setModels] = useState<{ id: string; label: string; key: string; url: string; model: string }[]>(
+  const [models, setModels] = useState<{ id: string; label: string; key: string; url: string; model: string; local_path: string }[]>(
     () => { try { return JSON.parse(localStorage.getItem("dv_models") || "[]"); } catch { return []; } }
   );
   const [selectedModel, setSelectedModel] = useState("");
@@ -78,7 +78,7 @@ function ControlBall() {
   const handleStart = () => {
     const m = models.find((m) => m.id === selectedModel);
     send({ type: "start", device_index: deviceId ? Number(deviceId) : undefined,
-      model: m?.model, api_key: m?.key, api_base_url: m?.url, pipeline_mode: pipelineMode, source_lang: lang, gpu: gpu });
+      model: m?.model, api_key: m?.key, api_base_url: m?.url, local_path: m?.local_path, pipeline_mode: pipelineMode, source_lang: lang, gpu: gpu });
   };
   const handleStop = () => send({ type: "stop" });
   const cycleMode = () => { if (isRunning) return; const i = modes.indexOf(pipelineMode); setPipelineMode(modes[(i+1)%3]); localStorage.setItem("dv_mode", modes[(i+1)%3]); };
@@ -232,14 +232,15 @@ const optStyle = (name: string, active: boolean): React.CSSProperties => ({ padd
 const Row = ({ label, value, color }: { label: string; value: string; color?: string }) => (<div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: "rgba(255,255,255,0.45)" }}>{label}</span><span style={{ color: color || "rgba(255,255,255,0.7)" }}>{value}</span></div>);
 const inputStyle: React.CSSProperties = { padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 11, outline: "none", width: "100%" };
 
-function AddModelForm({ onAdd }: { onAdd: (m: { id: string; label: string; key: string; url: string; model: string }) => void }) {
-  const [label, setLabel] = useState(""); const [key, setKey] = useState(""); const [url, setUrl] = useState(""); const [model, setModel] = useState("");
-  const submit = () => { if (!label || !key) return; onAdd({ id: Date.now().toString(36), label, key, url, model }); };
+function AddModelForm({ onAdd }: { onAdd: (m: { id: string; label: string; key: string; url: string; model: string; local_path: string }) => void }) {
+  const [label, setLabel] = useState(""); const [key, setKey] = useState(""); const [url, setUrl] = useState(""); const [model, setModel] = useState(""); const [localPath, setLocalPath] = useState("");
+  const submit = () => { if (!label || (!key && !localPath)) return; onAdd({ id: Date.now().toString(36), label, key, url, model, local_path: localPath }); };
   return (<div style={{ padding: 8, borderRadius: 6, background: "rgba(255,255,255,0.03)" }}>
-    <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="名称 (如 DeepSeek)" style={inputStyle} />
-    <input value={key} onChange={(e) => setKey(e.target.value)} placeholder="API Key" type="password" style={inputStyle} />
+    <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="名称 (如 NLLB-200)" style={inputStyle} />
+    <input value={key} onChange={(e) => setKey(e.target.value)} placeholder="API Key (云端模型)" type="password" style={inputStyle} />
     <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="API Base URL (可选)" style={inputStyle} />
     <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="Model (可选)" style={inputStyle} />
+    <input value={localPath} onChange={(e) => setLocalPath(e.target.value)} placeholder="本地模型路径 (可选，如 ./models/nllb)" style={{ ...inputStyle, borderColor: localPath ? "rgba(74,222,128,0.3)" : undefined }} />
     <button onClick={submit} style={{ width: "100%", padding: "5px 0", border: "none", borderRadius: 6, background: "#4ade80", color: "#000", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>添加</button>
   </div>);
 }

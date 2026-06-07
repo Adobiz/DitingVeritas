@@ -372,6 +372,7 @@ async def translate_websocket(ws: WebSocket):
                 if data.get("api_key"): config.translator.openai_api_key = data["api_key"]
                 if data.get("api_base_url"): config.translator.openai_base_url = data["api_base_url"]
                 if data.get("model"): config.translator.model = data["model"]
+                if data.get("local_path"): config.translator.local_path = data["local_path"]
                 if data.get("pipeline_mode"): config.pipeline_mode = data["pipeline_mode"]
                 if data.get("gpu"):
                     import torch
