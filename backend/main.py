@@ -23,7 +23,7 @@ from pipeline.audio_capture import AudioCapture
 from pipeline.vad import VoiceActivityDetector
 from pipeline.asr import ASREngine
 from pipeline.translator import create_translator
-from pipeline.modes import MODES
+from pipeline.modes import get_mode
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logger = logging.getLogger("diting")
@@ -100,33 +100,26 @@ class TranslationPipeline:
 
     async def _run(self):
         loop = asyncio.get_running_loop()
-        mode = MODES.get(getattr(config, "pipeline_mode", "balanced"), MODES["balanced"])
-        # 动态调整 VAD 静音阈值
-        self._vad._cfg.min_silence_duration_ms = mode.vad_silence_ms
+        mode_name = getattr(config, "pipeline_mode", "balanced") or "balanced"
+        mode = get_mode(mode_name)
         logger.info(f"管道模式: {mode.label} (interval={mode.asr_interval}s, silence={mode.vad_silence_ms}ms)")
 
         from time import monotonic as _clock
-        buf = []          # 音频缓冲
-        last_infer = 0.0  # 上次推理时间
-        _last_text = ""   # 上次 ASR 结果
-        _task = None      # 当前推理任务
-        _trans_task = None
+        buf = []
+        last_infer = 0.0
+        _last_text = ""
+        _task = None
         seq = 0
-        last_quality = None
         pending = []
+        last_quality = None
         max_buf = int(mode.asr_buffer_sec * 16000)
 
         async def _do_translate(src: str, s: int):
-            nonlocal _trans_task
-            if _trans_task and not _trans_task.done():
-                if mode.drop_stale: _trans_task.cancel()
-            if mode.fallback_original or True:
+            if mode.fallback_original:
                 await self._send(ServerMessage.translation(
                     TranslationResult(source_text=src, translation="", is_partial=True, segment_id=str(s))))
             try:
                 t = await self._translator.translate_async(src)
-            except asyncio.CancelledError:
-                return
             except Exception:
                 t = src
             if t and t != src:
@@ -151,12 +144,13 @@ class TranslationPipeline:
             # ── interim: 按模式频率推理 ──
             if mode.show_interim and self._vad.is_speaking:
                 buf.append(chunk)
-                buf = buf[-max(1, max_buf // len(chunk)):]
+                chunk_len = len(chunk) or 1
+                buf = buf[-max(1, max_buf // chunk_len):]
                 now = _clock()
                 if now - last_infer >= mode.asr_interval:
                     last_infer = now
-                    if _task and not _task.done():
-                        if mode.drop_stale: continue
+                    if _task and not _task.done() and mode.drop_stale:
+                        continue
                     audio = np.concatenate(buf)[-max_buf:]
                     _task = asyncio.create_task(self._turbo_infer(loop, audio, _last_text, mode))
             else:

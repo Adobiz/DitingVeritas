@@ -54,3 +54,9 @@ MODES = {
         fallback_original=True,
     ),
 }
+
+DEFAULT_MODE = MODES["balanced"]
+
+
+def get_mode(name: str) -> PipelineMode:
+    return MODES.get(name, DEFAULT_MODE)
