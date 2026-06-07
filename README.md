@@ -23,7 +23,8 @@ cp .env.example .env
 # 3. 启动（前后端自动）
 cd frontend
 npm install
-npm run electron:dev
+npm run electron:build
+然后在release/win-unpacked/DitingVeritas.exe 运行测试
 ```
 
 双击悬浮球「谛」→ ⚙ 设置 → 选择模型 → ▶ 开始 → 播放英文音频即可。
