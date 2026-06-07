@@ -2,7 +2,7 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from config import config
+from config import config, LANG_NAMES
 
 logger = logging.getLogger("diting.translator")
 
@@ -45,7 +45,7 @@ class ClaudeTranslator(TranslatorBackend):
                 model=self._model,
                 max_tokens=config.translator.max_tokens,
                 temperature=config.translator.temperature,
-                system=config.translator.system_prompt,
+                system=config.translator.system_prompt.replace("{src_lang}", LANG_NAMES.get(config.asr.language, "英文")),
                 messages=[{"role": "user", "content": text}],
             )
             return resp.content[0].text.strip()
@@ -86,7 +86,7 @@ class OpenAITranslator(TranslatorBackend):
                 max_tokens=config.translator.max_tokens,
                 temperature=config.translator.temperature,
                 messages=[
-                    {"role": "system", "content": config.translator.system_prompt},
+                    {"role": "system", "content": config.translator.system_prompt.replace("{src_lang}", LANG_NAMES.get(config.asr.language, "英文"))},
                     {"role": "user", "content": text},
                 ],
             )
@@ -109,7 +109,7 @@ class OpenAITranslator(TranslatorBackend):
                 model=self._model, max_tokens=config.translator.max_tokens,
                 temperature=config.translator.temperature, stream=True,
                 messages=[
-                    {"role": "system", "content": config.translator.system_prompt},
+                    {"role": "system", "content": config.translator.system_prompt.replace("{src_lang}", LANG_NAMES.get(config.asr.language, "英文"))},
                     {"role": "user", "content": text},
                 ],
             )

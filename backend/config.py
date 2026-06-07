@@ -49,7 +49,7 @@ class TranslatorConfig:
     max_tokens: int = 256
     system_prompt: str = field(
         default=(
-            "你是实时同声传译 AI，场景：英语演讲/会议直播。\n"
+            "你是实时同声传译 AI。将{src_lang}实时翻译为中文。\n"
             "规则：\n"
             "1. 输入可能是不完整片段，请根据语义合理推测并补齐，而非字面直译\n"
             "2. 只输出中文，每段≤25字，口语化、流畅自然\n"
@@ -79,5 +79,7 @@ class Config:
 
 
     pipeline_mode: str = field(default_factory=lambda: os.getenv("PIPELINE_MODE", "balanced"))
+
+LANG_NAMES = {"en":"英文","zh":"中文","ja":"日语","ko":"韩语","fr":"法语","de":"德语","es":"西班牙语","ru":"俄语","ar":"阿拉伯语","pt":"葡萄牙语","it":"意大利语"}
 
 config = Config()
