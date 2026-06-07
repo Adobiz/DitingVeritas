@@ -26,7 +26,7 @@ class VADConfig:
 
 @dataclass
 class ASRConfig:
-    model_size: str = "small"
+    model_size: str = "tiny"
     compute_type: str = "int8"
     language: str = "en"
     beam_size: int = 5

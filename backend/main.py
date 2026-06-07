@@ -54,6 +54,7 @@ class TranslationPipeline:
         self._last_tl_text = ""
         self._incr = IncrementalProcessor()
         self._confirmed_tl = ""
+        self._tl_lock = asyncio.Lock()
 
     async def start(self, req: StartRequest | None = None):
         if self.status == PipelineStatus.RUNNING:
@@ -157,19 +158,20 @@ class TranslationPipeline:
         await asyncio.sleep(mode.translate_debounce_ms / 1000.0)
         if seq_id != self._interim_seq: return
         if text == self._last_tl_text: return
-        try:
-            accumulated = ""
-            gen = self._translator.translate_stream_async(text)
-            async for token in gen:
-                accumulated += token
-                await self._send(ServerMessage.translation(
-                    TranslationResult(source_text=text, translation=accumulated, is_partial=True)))
-            if accumulated:
-                self._last_tl_text = text
-                await self._send(ServerMessage.translation(
-                    TranslationResult(source_text=text, translation=accumulated, is_partial=False)))
-        except Exception as e:
-            logger.debug(f"翻译异常: {e}")
+        async with self._tl_lock:
+            try:
+                accumulated = ""
+                gen = self._translator.translate_stream_async(text)
+                async for token in gen:
+                    accumulated += token
+                    await self._send(ServerMessage.translation(
+                        TranslationResult(source_text=text, translation=accumulated, is_partial=True)))
+                if accumulated:
+                    self._last_tl_text = text
+                    await self._send(ServerMessage.translation(
+                        TranslationResult(source_text=text, translation=accumulated, is_partial=False)))
+            except Exception as e:
+                logger.debug(f"翻译异常: {e}")
 
     async def _run_stable(self, loop, mode):
         """稳定：后台低频缓存 ASR，final 直接翻译"""

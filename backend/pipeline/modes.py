@@ -19,10 +19,10 @@ class PipelineMode:
 MODES = {
     "turbo": PipelineMode(
         label="强化",
-        asr_interval=0.2,
-        asr_buffer_sec=2,
+        asr_interval=1.5,
+        asr_buffer_sec=1.5,
         vad_silence_ms=300,
-        translate_debounce_ms=100,
+        translate_debounce_ms=0,
         min_words=1,
         context_len=1,
         show_interim=True,
