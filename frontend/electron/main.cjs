@@ -1,7 +1,9 @@
 const { app, BrowserWindow, Tray, Menu, screen, ipcMain, nativeImage } = require("electron");
 const path = require("path");
+const { spawn } = require("child_process");
 
 let ctrlWin = null, tray = null, isQuitting = false;
+let backendProcess = null;
 const BALL = 48, BAR_W = 360, BAR_H = 200;
 
 let iconIdle = null, iconActive = null;
@@ -35,6 +37,48 @@ function createTray() {
     { label: "退出", click: () => { isQuitting = true; app.quit(); } },
   ]));
   tray.on("double-click", () => ctrlWin?.isVisible() ? ctrlWin.hide() : ctrlWin?.show());
+}
+
+function startBackend() {
+  const isPackaged = app.isPackaged;
+
+  if (isPackaged) {
+    // 打包模式：用内置的 PyInstaller 后端 EXE
+    const exe = path.join(process.resourcesPath, "backend", "diting-backend.exe");
+    if (fs.existsSync(exe)) {
+      console.log("[启动] 后端 EXE:", exe);
+      backendProcess = spawn(exe, [], { stdio: "pipe", windowsHide: true });
+    } else {
+      console.log("[启动] 后端 EXE 未找到，尝试 Python:", exe);
+    }
+  }
+
+  if (!backendProcess) {
+    // 回退：用 python main.py
+    const backendDir = app.isPackaged
+      ? path.join(process.resourcesPath, "backend")
+      : path.join(__dirname, "../../backend");
+    console.log("[启动] 后端:", backendDir);
+    backendProcess = spawn("python", ["main.py"], {
+      cwd: backendDir, stdio: "pipe", windowsHide: true,
+    });
+  }
+
+  if (backendProcess) {
+    backendProcess.stdout.on("data", (d) => console.log("[后端]", d.toString().trim()));
+    backendProcess.stderr.on("data", (d) => console.log("[后端]", d.toString().trim()));
+    backendProcess.on("error", (err) => console.log("[后端] 启动失败:", err.message));
+    backendProcess.on("exit", (code) => {
+      if (code !== 0 && !isQuitting) console.log("[后端] 异常退出, code:", code);
+    });
+  }
+}
+
+function stopBackend() {
+  if (backendProcess) {
+    backendProcess.kill();
+    backendProcess = null;
+  }
 }
 
 function createWindow() {
@@ -75,6 +119,10 @@ ipcMain.handle("set-tray-active", (_e, active) => {
 ipcMain.handle("open-external", (_e, url) => { require("electron").shell.openExternal(url); });
 ipcMain.handle("close-window", () => ctrlWin?.hide());
 
-app.whenReady().then(() => { createWindow(); createTray(); });
+app.whenReady().then(() => {
+  startBackend();
+  createWindow();
+  createTray();
+});
 app.on("window-all-closed", () => { });
-app.on("before-quit", () => { isQuitting = true; });
+app.on("before-quit", () => { isQuitting = true; stopBackend(); });

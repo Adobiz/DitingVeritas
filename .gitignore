@@ -21,5 +21,9 @@ node_modules/
 .DS_Store
 Thumbs.db
 
+# PyInstaller
+backend/dist/
+backend/build/
+
 # Build
 release/
