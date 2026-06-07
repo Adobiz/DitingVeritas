@@ -29,6 +29,10 @@ def _get_torch():
 class VoiceActivityDetector:
     _MAX_BUFFER_SAMPLES = 30 * 16000
 
+    @property
+    def is_speaking(self) -> bool:
+        return self._speaking
+
     def __init__(self):
         self._model = _get_model()
         self._audio_buffer = np.array([], dtype=np.float32)

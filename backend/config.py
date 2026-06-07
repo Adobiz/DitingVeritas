@@ -18,8 +18,8 @@ class AudioConfig:
 @dataclass
 class VADConfig:
     threshold: float = 0.5
-    min_speech_duration_ms: int = 400   # 低于此忽略
-    min_silence_duration_ms: int = 500  # 句间静音阈值（防碎片化）
+    min_speech_duration_ms: int = 500   # 低于此忽略
+    min_silence_duration_ms: int = 800  # 句间静音阈值（防碎片化）
     speech_pad_ms: int = 200
     sample_rate: int = 16000
 
@@ -31,6 +31,14 @@ class ASRConfig:
     language: str = "en"
     beam_size: int = 5
     vad_filter: bool = False  # 由外部 VAD 模块处理
+
+
+@dataclass
+class ASRProviderConfig:
+    provider: str = field(default_factory=lambda: os.getenv("ASR_PROVIDER", "local"))
+    aliyun_app_key: str = field(default_factory=lambda: os.getenv("ALIYUN_APP_KEY", ""))
+    aliyun_access_key: str = field(default_factory=lambda: os.getenv("ALIYUN_ACCESS_KEY", ""))
+    aliyun_access_secret: str = field(default_factory=lambda: os.getenv("ALIYUN_ACCESS_SECRET", ""))
 
 
 @dataclass
@@ -58,6 +66,7 @@ class Config:
     audio: AudioConfig = field(default_factory=AudioConfig)
     vad: VADConfig = field(default_factory=VADConfig)
     asr: ASRConfig = field(default_factory=ASRConfig)
+    asr_provider: ASRProviderConfig = field(default_factory=ASRProviderConfig)
     translator: TranslatorConfig = field(default_factory=TranslatorConfig)
     context: ContextConfig = field(default_factory=ContextConfig)
 
