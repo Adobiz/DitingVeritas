@@ -92,6 +92,19 @@ class TranslationPipeline:
             try: self._queue.get_nowait()
             except asyncio.QueueEmpty: break
 
+    class _IncASR:
+        """增量 ASR：只返回新增文本（不重复）"""
+        def __init__(self, asr, loop):
+            self._a, self._l, self._last = asr, loop, ""
+        async def delta(self, audio):
+            try: results = await self._l.run_in_executor(None, self._a.transcribe, audio)
+            except Exception: return ""
+            text = " ".join(r["text"] for r in results).strip()
+            if not text: return ""
+            if text.startswith(self._last):
+                d = text[len(self._last):].strip(); self._last = text; return d
+            self._last = text; return text  # 修正→整句
+
     # ── 纯 ASR（不翻译）──────────────────────
 
     async def _infer_only(self, loop, audio: np.ndarray) -> str | None:
@@ -106,21 +119,24 @@ class TranslationPipeline:
 
     # ── 独立翻译任务 ─────────────────────────
 
-    async def _tl_interim(self, text: str, mode, seq_id: int):
+    async def _tl_stream(self, text: str, mode, seq_id: int, loop):
         if not text: return
         await asyncio.sleep(mode.translate_debounce_ms / 1000.0)
         if seq_id != self._interim_seq: return
         if text == self._last_tl_text: return
         try:
-            t = await self._translator.translate_async(text)
-            if t and t != text:
+            accumulated = ""
+            gen = self._translator.translate_stream_async(text)
+            async for token in gen:
+                accumulated += token
+                await self._send(ServerMessage.translation(
+                    TranslationResult(source_text=text, translation=accumulated, is_partial=True)))
+            if accumulated:
                 self._last_tl_text = text
                 await self._send(ServerMessage.translation(
-                    TranslationResult(source_text=text, translation=t, is_partial=True)))
+                    TranslationResult(source_text=text, translation=accumulated, is_partial=False)))
         except Exception as e:
             logger.debug(f"翻译异常: {e}")
-
-    # ── 主循环 ───────────────────────────────
 
     async def _run(self):
         loop = asyncio.get_running_loop()
@@ -128,6 +144,7 @@ class TranslationPipeline:
         logger.info(f"模式: {mode.label} (int={mode.asr_interval}s buf={mode.asr_buffer_sec}s sil={mode.vad_silence_ms}ms)")
 
         from time import monotonic as _clock
+        inc = self._IncASR(self._asr, loop)
         buf, last_infer, seq = [], 0.0, 0
         pending, last_quality = [], None
         max_s = int(mode.asr_buffer_sec * 16000)
@@ -167,7 +184,7 @@ class TranslationPipeline:
                     audio = np.concatenate(buf)
                     if len(audio) >= min_s:
                         self._infer_task = asyncio.create_task(
-                            self._infer_only(loop, audio[-max_s:]))
+                            inc.delta(audio[-max_s:]))
             elif not mode.show_interim:
                 buf = []
 
@@ -186,7 +203,7 @@ class TranslationPipeline:
                         if self._interim_tl_task and not self._interim_tl_task.done() and mode.drop_stale:
                             self._interim_tl_task.cancel()
                         self._interim_tl_task = asyncio.create_task(
-                            self._tl_interim(text, mode, self._interim_seq))
+                            self._tl_stream(text, mode, self._interim_seq, loop))
 
             # ── VAD final ──
             for seg in segments:
