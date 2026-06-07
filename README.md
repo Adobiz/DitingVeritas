@@ -95,11 +95,17 @@ DitingVeritas/
 
 ## 本地模型
 faster-whisper 首次运行自动下载，这边也提供手动下载链接
+
 官网：
+
 https://huggingface.co/Systran/faster-whisper-tiny
+
 https://huggingface.co/Systran/faster-whisper-small
+
 镜像：
+
 https://hf-mirror.com/Systran/faster-whisper-tiny
+
 https://hf-mirror.com/Systran/faster-whisper-small
 
 支持 CTranslate2 格式的 NLLB-200 int8 量化模型：
