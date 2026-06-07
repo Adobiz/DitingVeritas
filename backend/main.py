@@ -23,6 +23,7 @@ from pipeline.audio_capture import AudioCapture
 from pipeline.vad import VoiceActivityDetector
 from pipeline.asr import ASREngine
 from pipeline.translator import create_translator
+from pipeline.modes import MODES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logger = logging.getLogger("diting")
@@ -99,35 +100,45 @@ class TranslationPipeline:
 
     async def _run(self):
         loop = asyncio.get_running_loop()
+        mode = MODES.get(getattr(config, "pipeline_mode", "balanced"), MODES["balanced"])
+        # 动态调整 VAD 静音阈值
+        self._vad._cfg.min_silence_duration_ms = mode.vad_silence_ms
+        logger.info(f"管道模式: {mode.label} (interval={mode.asr_interval}s, silence={mode.vad_silence_ms}ms)")
+
+        from time import monotonic as _clock
+        buf = []          # 音频缓冲
+        last_infer = 0.0  # 上次推理时间
+        _last_text = ""   # 上次 ASR 结果
+        _task = None      # 当前推理任务
+        _trans_task = None
+        seq = 0
         last_quality = None
         pending = []
-        seq = 0
+        max_buf = int(mode.asr_buffer_sec * 16000)
 
-        async def _translate_and_send(src: str, s: int):
-            """异步翻译，先推原文再推译文"""
-            # 立刻推原文（is_partial=True，前端显示英文）
-            await self._send(ServerMessage.translation(
-                TranslationResult(source_text=src, translation="", is_partial=True,
-                                  segment_id=str(s))))
+        async def _do_translate(src: str, s: int):
+            nonlocal _trans_task
+            if _trans_task and not _trans_task.done():
+                if mode.drop_stale: _trans_task.cancel()
+            if mode.fallback_original or True:
+                await self._send(ServerMessage.translation(
+                    TranslationResult(source_text=src, translation="", is_partial=True, segment_id=str(s))))
             try:
                 t = await self._translator.translate_async(src)
+            except asyncio.CancelledError:
+                return
             except Exception:
                 t = src
-            if t != src:
+            if t and t != src:
                 logger.info(f"翻译: {t[:50]}")
-            else:
-                logger.warning("翻译回退原文，请检查 API key 或网络")
-            # 译文就绪（is_partial=False，前端替换为中文）
             await self._send(ServerMessage.translation(
-                TranslationResult(source_text=src, translation=t, is_partial=False,
-                                  segment_id=str(s))))
+                TranslationResult(source_text=src, translation=t or src, is_partial=False, segment_id=str(s))))
 
         while self.status == PipelineStatus.RUNNING:
             try:
                 chunk, rms = await asyncio.wait_for(self._queue.get(), timeout=0.5)
             except asyncio.TimeoutError:
                 continue
-
             if self.status != PipelineStatus.RUNNING:
                 break
 
@@ -135,49 +146,65 @@ class TranslationPipeline:
             try:
                 segments = self._vad.process(chunk)
             except Exception as e:
-                logger.error(f"VAD 异常: {e}")
-                continue
+                logger.error(f"VAD: {e}"); continue
 
-            # VAD 切句 → ASR → 异步翻译
+            # ── interim: 按模式频率推理 ──
+            if mode.show_interim and self._vad.is_speaking:
+                buf.append(chunk)
+                buf = buf[-max(1, max_buf // len(chunk)):]
+                now = _clock()
+                if now - last_infer >= mode.asr_interval:
+                    last_infer = now
+                    if _task and not _task.done():
+                        if mode.drop_stale: continue
+                    audio = np.concatenate(buf)[-max_buf:]
+                    _task = asyncio.create_task(self._turbo_infer(loop, audio, _last_text, mode))
+            else:
+                buf = []
+
+            # ── VAD final: 切句 → ASR + 翻译 ──
             for seg in segments:
                 audio = seg.get("audio")
-                if audio is None or len(audio) == 0:
-                    continue
-                # 截断到最近 6s，加快 ASR
-                max_samples = 6 * 16000
-                if len(audio) > max_samples:
-                    audio = audio[-max_samples:]
+                if audio is None or len(audio) == 0: continue
+                buf = []
+                if len(audio) > max_buf: audio = audio[-max_buf:]
                 try:
                     results = await loop.run_in_executor(None, self._asr.transcribe, audio)
-                except Exception as e:
-                    logger.error(f"ASR 异常: {e}")
-                    continue
-                if not results:
-                    continue
-
+                except Exception: continue
+                if not results: continue
                 text = " ".join(r["text"] for r in results)
-                logger.info(f"ASR: {text[:80]}")
+                logger.info(f"ASR(final): {text[:80]}")
                 seq += 1
-
-                if len(text.split()) < 5:
+                if len(text.split()) < mode.min_words:
                     pending.append(text)
                     if len(pending) >= 3:
-                        batch = " ".join(pending)
-                        pending = []
-                        asyncio.create_task(_translate_and_send(batch, seq))
+                        batch = " ".join(pending); pending = []
+                        asyncio.create_task(_do_translate(batch, seq))
                 else:
-                    if pending:
-                        text = " ".join(pending + [text])
-                        pending = []
-                    asyncio.create_task(_translate_and_send(text, seq))
+                    if pending: text = " ".join(pending + [text]); pending = []
+                    asyncio.create_task(_do_translate(text, seq))
+                _last_text = text
 
-            # 音频质量推送
             quality = self._rms_quality(rms)
             if quality != last_quality:
                 last_quality = quality
-                await self._send(ServerMessage.status(
-                    StatusUpdate(status=PipelineStatus.RUNNING, message="", audio_quality=quality)
-                ))
+                await self._send(ServerMessage.status(StatusUpdate(status=PipelineStatus.RUNNING, message="", audio_quality=quality)))
+
+    async def _turbo_infer(self, loop, audio, last_text, mode):
+        try:
+            results = await loop.run_in_executor(None, self._asr.transcribe, audio)
+            text = " ".join(r["text"] for r in results)
+            if not text or text == last_text: return last_text
+            logger.debug(f"ASR(interim): {text[:60]}")
+            await self._send(ServerMessage.translation(
+                TranslationResult(source_text=text, translation="", is_partial=True)))
+            if mode.translate_debounce_ms < 200:
+                t = await self._translator.translate_async(text)
+                if t and t != text:
+                    await self._send(ServerMessage.translation(
+                        TranslationResult(source_text=text, translation=t, is_partial=True)))
+            return text
+        except Exception: return last_text
 
     # ── 辅助 ──────────────────────────────────
 
@@ -261,6 +288,8 @@ async def translate_websocket(ws: WebSocket):
                     config.translator.openai_base_url = data["api_base_url"]
                 if data.get("model"):
                     config.translator.model = data["model"]
+                if data.get("pipeline_mode"):
+                    config.pipeline_mode = data["pipeline_mode"]
                 pipeline = TranslationPipeline(ws)
                 await pipeline.start(req)
                 state.status = PipelineStatus.RUNNING

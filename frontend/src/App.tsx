@@ -22,6 +22,10 @@ function ControlBall() {
   const [source, setSource] = useState("");
   const [translation, setTranslation] = useState("");
   const [showControls, setShowControls] = useState(true);
+  const [pipelineMode, setPipelineMode] = useState<string>(() => localStorage.getItem("dv_mode") || "balanced");
+  const modes = ["turbo", "balanced", "stable"];
+  const modeLabel: Record<string, string> = { turbo: "强化", balanced: "均衡", stable: "稳定" };
+  const modeColor: Record<string, string> = { turbo: "#f59e0b", balanced: "#60a5fa", stable: "#4ade80" };
   const panelRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -56,9 +60,16 @@ function ControlBall() {
   const handleStart = () => {
     const m = models.find((m) => m.id === selectedModel);
     send({ type: "start", device_index: deviceId ? Number(deviceId) : undefined,
-      model: m?.model, api_key: m?.key, api_base_url: m?.url });
+      model: m?.model, api_key: m?.key, api_base_url: m?.url,
+      pipeline_mode: pipelineMode });
   };
   const handleStop = () => send({ type: "stop" });
+  const cycleMode = () => {
+    if (isRunning) return;
+    const i = modes.indexOf(pipelineMode);
+    setPipelineMode(modes[(i + 1) % 3]);
+    localStorage.setItem("dv_mode", modes[(i + 1) % 3]);
+  };
   const handleDeleteModel = (id: string) => {
     const next = models.filter((m) => m.id !== id);
     setModels(next);
@@ -129,6 +140,10 @@ function ControlBall() {
             <button onClick={() => { if (!isRunning) return; setShowControls(!showControls); setSettings(false); }}
               disabled={!isRunning} title={isRunning ? "字幕模式" : "启动后可切换"}
               style={{ ...btn(!showControls && isRunning ? q : "#374151"), opacity: isRunning ? 1 : 0.3 }}>▤</button>
+            <button onClick={cycleMode} disabled={isRunning} title={`模式: ${modeLabel[pipelineMode]}`}
+              style={{ ...btn(modeColor[pipelineMode]), opacity: isRunning ? 0.4 : 1, fontSize: 10, fontWeight: 700 }}>
+              {modeLabel[pipelineMode][0]}
+            </button>
             <button onClick={toggleSettings} style={btn(settings ? q : "#374151")}>⚙</button>
           </div>
           <span style={{ fontSize: 14, color: "rgba(255,255,255,0.25)", cursor: "grab", WebkitAppRegion: "drag",
