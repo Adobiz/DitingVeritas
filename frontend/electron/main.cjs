@@ -72,6 +72,7 @@ ipcMain.handle("set-height", (_e, h) => {
 ipcMain.handle("set-tray-active", (_e, active) => {
   tray?.setImage(active ? iconActive : iconIdle);
 });
+ipcMain.handle("open-external", (_e, url) => { require("electron").shell.openExternal(url); });
 ipcMain.handle("close-window", () => ctrlWin?.hide());
 
 app.whenReady().then(() => { createWindow(); createTray(); });

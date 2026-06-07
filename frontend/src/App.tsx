@@ -65,7 +65,7 @@ function ControlBall() {
   };
   const toggleTheme = () => {
     const n = !showTheme; setShowTheme(n); setSettings(false);
-    window.electronAPI?.setHeight(n ? 280 : 200);
+    window.electronAPI?.setHeight(n ? 260 : 200);
   };
   const handleStart = () => {
     const m = models.find((m) => m.id === selectedModel);
@@ -86,7 +86,7 @@ function ControlBall() {
   useEffect(() => {
     if (!expanded) return;
     if (settings) { window.electronAPI?.setHeight(showAddModel ? 560 : 460); return; }
-    if (showTheme) { window.electronAPI?.setHeight(280); return; }
+    if (showTheme) { window.electronAPI?.setHeight(260); return; }
     if (!isRunning && !showControls) { window.electronAPI?.setHeight(80); return; }
     if (!isRunning) { window.electronAPI?.setHeight(200); return; }
     const el = panelRef.current; if (!el) return;
@@ -105,7 +105,7 @@ function ControlBall() {
   }
 
   return (
-    <div ref={panelRef} style={{ height: "auto", minHeight: showControls ? "auto" : 80, padding: (settings||showTheme) ? 12 : "0 12px", background: bg(1), backdropFilter: (settings||showTheme) ? "blur(14px)" : "blur(12px)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", fontSize: 13, color: "#fff", userSelect: "none", display: "flex", flexDirection: "column", WebkitAppRegion: "drag" }}>
+    <div ref={panelRef} style={{ height: "auto", minHeight: showControls ? "auto" : 80, padding: (settings||showTheme) ? 12 : "0 12px", background: bg(1), backdropFilter: (settings||showTheme) ? "blur(14px)" : "blur(12px)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", fontSize: 13, color: "#fff", userSelect: "none", display: "flex", flexDirection: "column" }}>
       {showControls && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, height: 44, minHeight: 44 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: q, flexShrink: 0 }} />
@@ -113,6 +113,7 @@ function ControlBall() {
             <button onClick={isRunning ? handleStop : handleStart} disabled={!connected} style={btn(isRunning ? "#374151" : q)}>{isRunning ? "■" : "▶"}</button>
             <button onClick={() => { if (!isRunning) return; setShowControls(!showControls); setSettings(false); }} disabled={!isRunning} title={isRunning ? "字幕模式" : "启动后可切换"} style={{ ...btn(!showControls && isRunning ? q : "#374151"), opacity: isRunning ? 1 : 0.3 }}>▤</button>
             <button onClick={cycleMode} disabled={isRunning} title={`模式: ${modeLabel[pipelineMode]}`} style={{ ...btn(modeColor[pipelineMode]), opacity: isRunning ? 0.4 : 1, fontSize: 10, fontWeight: 700 }}>{modeLabel[pipelineMode][0]}</button>
+            <button onClick={() => { window.electronAPI?.openExternal("https://github.com/Adobiz"); }} style={btn("#374151")} title="GitHub">🐱</button>
             <button onClick={toggleTheme} style={btn(showTheme ? pc : "#374151")}>🎨</button>
             <button onClick={toggleSettings} style={btn(settings ? pc : "#374151")}>⚙</button>
           </div>
