@@ -49,6 +49,13 @@ function ControlBall() {
       if (msg.payload.source_text) setSource(msg.payload.source_text);
       if (msg.payload.translation) setTranslation(msg.payload.translation);
     }
+    if (msg.type === "correction") {
+      if (msg.payload.new_translation) {
+        setTranslation(msg.payload.new_translation);
+        setToast("已自动修正翻译");
+        setTimeout(() => setToast(""), 2000);
+      }
+    }
   }, []);
   const { connected, status, send, connect } = useWebSocket({ url: WS, onMessage: onMsg });
 

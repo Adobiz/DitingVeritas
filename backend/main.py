@@ -11,6 +11,7 @@ from config import config
 from models.schemas import (
     AudioQuality,
     ContextUpdate,
+    CorrectionResult,
     ErrorMessage,
     MessageType,
     PipelineStatus,
@@ -26,6 +27,7 @@ from pipeline.translator import create_translator
 from pipeline.modes import get_mode
 from pipeline.incremental import IncrementalProcessor
 from pipeline.context_loader import load_context, build_context_block
+from pipeline.corrector import Corrector
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logger = logging.getLogger("diting")
@@ -55,6 +57,7 @@ class TranslationPipeline:
         self._incr = IncrementalProcessor()
         self._confirmed_tl = ""
         self._tl_lock = asyncio.Lock()
+        self._corrector = Corrector()
 
     async def start(self, req: StartRequest | None = None):
         if self.status == PipelineStatus.RUNNING:
@@ -203,8 +206,10 @@ class TranslationPipeline:
                 logger.info(f"ASR(final): {text[:80]}")
                 try: t = await self._translator.translate_async(text)
                 except Exception: t = text
+                sid = str(int(_clock() * 1000))
                 await self._send(ServerMessage.translation(
-                    TranslationResult(source_text=text, translation=t or text, is_partial=False)))
+                    TranslationResult(source_text=text, translation=t or text, is_partial=False, segment_id=sid)))
+                asyncio.create_task(self._check_correction(sid, text, t or text))
 
     async def _run(self):
         loop = asyncio.get_running_loop()
@@ -226,8 +231,10 @@ class TranslationPipeline:
             self._confirmed_tl = ""
             try: t = await self._translator.translate_async(src)
             except Exception: t = src
+            sid = str(s)
             await self._send(ServerMessage.translation(
-                TranslationResult(source_text=src, translation=t or src, is_partial=False, segment_id=str(s))))
+                TranslationResult(source_text=src, translation=t or src, is_partial=False, segment_id=sid)))
+            asyncio.create_task(self._check_correction(sid, src, t or src))
 
         while self.status == PipelineStatus.RUNNING:
             try:
@@ -336,6 +343,25 @@ class TranslationPipeline:
 
     async def _push_status(self, message: str):
         await self._send(ServerMessage.status(StatusUpdate(status=self.status, message=message)))
+
+    async def _check_correction(self, seg_id: str, src: str, tl: str):
+        """异步纠错检查：翻译完成后用 LLM 回溯检查前文"""
+        self._corrector.feed(seg_id, src, tl)
+        check_text = self._corrector.build_check_text(src, tl)
+        if not check_text:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+            resp = await loop.run_in_executor(
+                None, self._translator.correction_check, check_text)
+            result = self._corrector.parse_response(resp)
+            if result:
+                result["old_translation"] = tl
+                await self._send(ServerMessage.correction(
+                    CorrectionResult(**result)))
+                logger.info(f"Correction: {result['new_translation'][:40]}")
+        except Exception as e:
+            logger.debug(f"纠错检查异常: {e}")
 
 
 class PipelineState:

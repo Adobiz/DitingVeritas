@@ -12,6 +12,10 @@ class TranslatorBackend(ABC):
 
     context_block: str = ""  # 闻境注入块，由管道设置
 
+    def correction_check(self, prompt: str) -> str:
+        """纠错检查：用校对 prompt 直调 LLM，不走翻译 system_prompt"""
+        return ""
+
     def _build_system(self, base: str) -> str:
         if self.context_block:
             return base + "\n\n" + self.context_block
@@ -60,6 +64,19 @@ class ClaudeTranslator(TranslatorBackend):
             logger.error(f"Claude 翻译失败: {e}")
             return text
 
+    def correction_check(self, prompt: str) -> str:
+        if not self._client: return "NO_FIX"
+        try:
+            resp = self._client.messages.create(
+                model=self._model, max_tokens=128, temperature=0.1,
+                system="你是翻译校对员。根据最新译文检查前文是否需要修正。不需要回复NO_FIX。需要回复FIX:segment_id=... | new=... | reason=...",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return resp.content[0].text.strip()
+        except Exception as e:
+            logger.debug(f"纠错检查失败: {e}")
+            return "NO_FIX"
+
 
 class OpenAITranslator(TranslatorBackend):
     """OpenAI 兼容 API 英→中（支持任意 OpenAI 兼容接口）"""
@@ -101,6 +118,21 @@ class OpenAITranslator(TranslatorBackend):
         except Exception as e:
             logger.error(f"OpenAI 翻译失败: {e}")
             return text
+
+    def correction_check(self, prompt: str) -> str:
+        if not self._client: return "NO_FIX"
+        try:
+            resp = self._client.chat.completions.create(
+                model=self._model, max_tokens=128, temperature=0.1,
+                messages=[
+                    {"role": "system", "content": "你是翻译校对员。检查前文是否需要修正。不需要回复NO_FIX。需要回复FIX:segment_id=... | new=... | reason=..."},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            return resp.choices[0].message.content.strip()
+        except Exception as e:
+            logger.debug(f"纠错检查失败: {e}")
+            return "NO_FIX"
 
     async def translate_stream_async(self, text: str):
         """流式翻译，逐 token 产出（异步）"""
