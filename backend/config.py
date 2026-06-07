@@ -48,7 +48,14 @@ class TranslatorConfig:
     temperature: float = 0.3
     max_tokens: int = 256
     system_prompt: str = field(
-        default="你是同声传译专家。将英文翻译成简洁中文。只输出译文。"
+        default=(
+            "你是实时同声传译 AI，场景：英语演讲/会议直播。\n"
+            "规则：\n"
+            "1. 输入可能是不完整片段，请根据语义合理推测并补齐，而非字面直译\n"
+            "2. 只输出中文，每段≤25字，口语化、流畅自然\n"
+            "3. 保持术语和风格一致（如前文提到人名/品牌名，沿用不重译）\n"
+            "4. 若输入仅为单词/短语，结合语境补全为通顺短句"
+        )
     )
     openai_api_key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
     openai_base_url: str = field(default_factory=lambda: os.getenv("OPENAI_BASE_URL", ""))
