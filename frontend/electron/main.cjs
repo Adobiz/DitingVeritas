@@ -1,11 +1,34 @@
-const { app, BrowserWindow, screen, ipcMain } = require("electron");
+const { app, BrowserWindow, Tray, Menu, screen, ipcMain, nativeImage } = require("electron");
 const path = require("path");
 
-let ctrlWin = null;
-const BALL = 48;
-const BAR_W = 360;
-const BAR_H = 200;
-const BAR_H_SETTINGS = 360;
+let ctrlWin = null, tray = null, isQuitting = false;
+const BALL = 48, BAR_W = 360, BAR_H = 200;
+
+let iconIdle = null, iconActive = null;
+
+function makeIcon(r, g, b) {
+  const size = 16, buf = Buffer.alloc(size * size * 4);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const d = Math.sqrt((x - 7.5) ** 2 + (y - 7.5) ** 2);
+      if (d <= 5.5) { buf[i] = r; buf[i + 1] = g; buf[i + 2] = b; buf[i + 3] = 255; }
+    }
+  return nativeImage.createFromBuffer(buf, { width: size, height: size, scaleFactor: 1.0 });
+}
+
+function createTray() {
+  iconIdle = makeIcon(107, 114, 128);    // 灰色 = 休息中
+  iconActive = makeIcon(59, 130, 246);   // 蓝色 = 翻译中
+  tray = new Tray(iconIdle);
+  tray.setToolTip("谛听·译真");
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: "显示/隐藏", click: () => ctrlWin?.isVisible() ? ctrlWin.hide() : ctrlWin?.show() },
+    { type: "separator" },
+    { label: "退出", click: () => { isQuitting = true; app.quit(); } },
+  ]));
+  tray.on("double-click", () => ctrlWin?.isVisible() ? ctrlWin.hide() : ctrlWin?.show());
+}
 
 function createWindow() {
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
@@ -16,14 +39,14 @@ function createWindow() {
     resizable: false, hasShadow: false, skipTaskbar: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
-      nodeIntegration: false, contextIsolation: true,
-      webSecurity: false,
+      nodeIntegration: false, contextIsolation: true, webSecurity: false,
     },
   });
   const url = app.isPackaged
     ? `file://${path.join(__dirname, "../dist/index.html")}`
     : "http://localhost:3000";
   ctrlWin.loadURL(url);
+  ctrlWin.on("close", (e) => { if (!isQuitting) { e.preventDefault(); ctrlWin.hide(); } });
 }
 
 ipcMain.handle("expand-control", () => {
@@ -38,7 +61,11 @@ ipcMain.handle("set-height", (_e, h) => {
   const [x, y] = ctrlWin.getPosition();
   ctrlWin.setBounds({ x, y, width: BAR_W, height: h }, true);
 });
-ipcMain.handle("close-window", () => ctrlWin?.close());
+ipcMain.handle("set-tray-active", (_e, active) => {
+  tray?.setImage(active ? iconActive : iconIdle);
+});
+ipcMain.handle("close-window", () => ctrlWin?.hide());
 
-app.whenReady().then(createWindow);
-app.on("window-all-closed", () => app.quit());
+app.whenReady().then(() => { createWindow(); createTray(); });
+app.on("window-all-closed", () => { });
+app.on("before-quit", () => { isQuitting = true; });
