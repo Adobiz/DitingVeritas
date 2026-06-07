@@ -7,7 +7,6 @@ interface ElectronAPI {
   setTrayActive: (active: boolean) => Promise<void>;
   openExternal: (url: string) => Promise<void>;
   close: () => Promise<void>;
-  onTrayCommand: (cb: (cmd: string) => void) => void;
 }
 declare global { interface Window { electronAPI?: ElectronAPI } }
 

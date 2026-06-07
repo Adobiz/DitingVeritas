@@ -6,5 +6,4 @@ contextBridge.exposeInMainWorld("electronAPI", {
   setTrayActive: (active) => ipcRenderer.invoke("set-tray-active", active),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
   close: () => ipcRenderer.invoke("close-window"),
-  onTrayCommand: (cb) => ipcRenderer.on("tray-command", (_e, cmd) => cb(cmd)),
 });
