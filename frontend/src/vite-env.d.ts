@@ -4,14 +4,14 @@ interface ElectronAPI {
   expandControl: () => Promise<void>;
   collapseControl: () => Promise<void>;
   setHeight: (h: number) => Promise<void>;
+  setTrayActive: (active: boolean) => Promise<void>;
   close: () => Promise<void>;
 }
+declare global { interface Window { electronAPI?: ElectronAPI } }
 
-declare global {
-  interface Window { electronAPI?: ElectronAPI }
-  namespace React {
-    interface CSSProperties { WebkitAppRegion?: string }
-  }
+import "react";
+declare module "react" {
+  interface CSSProperties { WebkitAppRegion?: string }
 }
 
 export {};
