@@ -100,7 +100,22 @@ class TranslationPipeline:
     async def _run(self):
         loop = asyncio.get_running_loop()
         last_quality = None
-        pending = []  # 短句缓存，凑够再翻
+        pending = []
+        seq = 0
+
+        async def _translate_and_send(src: str, s: int):
+            """异步翻译，不阻塞 ASR"""
+            try:
+                t = await self._translator.translate_async(src)
+            except Exception:
+                t = src
+            if t != src:
+                logger.info(f"翻译: {t[:50]}")
+            else:
+                logger.warning("翻译回退原文，请检查 API key 或网络")
+            await self._send(ServerMessage.translation(
+                TranslationResult(source_text=src, translation=t, is_partial=False,
+                                  segment_id=str(s))))
 
         while self.status == PipelineStatus.RUNNING:
             try:
@@ -118,7 +133,7 @@ class TranslationPipeline:
                 logger.error(f"VAD 异常: {e}")
                 continue
 
-            # VAD 切句 → ASR + 翻译
+            # VAD 切句 → ASR → 异步翻译
             for seg in segments:
                 audio = seg.get("audio")
                 if audio is None or len(audio) == 0:
@@ -133,30 +148,19 @@ class TranslationPipeline:
 
                 text = " ".join(r["text"] for r in results)
                 logger.info(f"ASR: {text[:80]}")
+                seq += 1
 
-                # 短句拼接：少于 5 个词暂存，凑够再翻
                 if len(text.split()) < 5:
                     pending.append(text)
                     if len(pending) >= 3:
                         batch = " ".join(pending)
                         pending = []
-                        translation = await self._translator.translate_async(batch)
-                        if translation != batch:
-                            logger.info(f"翻译(batch): {translation[:50]}")
-                        await self._send(ServerMessage.translation(
-                            TranslationResult(source_text=batch, translation=translation, is_partial=False)))
+                        asyncio.create_task(_translate_and_send(batch, seq))
                 else:
-                    # 长句直接翻，先把之前攒的一起合并
                     if pending:
                         text = " ".join(pending + [text])
                         pending = []
-                    translation = await self._translator.translate_async(text)
-                    if translation != text:
-                        logger.info(f"翻译: {translation[:50]}")
-                    else:
-                        logger.warning("翻译回退原文，请检查 API key 或网络")
-                    await self._send(ServerMessage.translation(
-                        TranslationResult(source_text=text, translation=translation, is_partial=False)))
+                    asyncio.create_task(_translate_and_send(text, seq))
 
             # 音频质量推送
             quality = self._rms_quality(rms)
