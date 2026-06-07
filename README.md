@@ -32,8 +32,6 @@ npm run electron:dev
 
 ```bash
 build.bat
-# 输出: frontend/release/DitingVeritas*.exe
-# 发给别人双击即用（需要运行 build.bat 生成）
 ```
 
 ## 功能
