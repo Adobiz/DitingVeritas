@@ -18,8 +18,8 @@ class AudioConfig:
 @dataclass
 class VADConfig:
     threshold: float = 0.5
-    min_speech_duration_ms: int = 400   # 低于此忽略
-    min_silence_duration_ms: int = 500  # 句间静音阈值（防碎片化）
+    min_speech_duration_ms: int = 500   # 低于此忽略
+    min_silence_duration_ms: int = 800  # 句间静音阈值（防碎片化）
     speech_pad_ms: int = 200
     sample_rate: int = 16000
 
