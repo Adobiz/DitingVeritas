@@ -95,6 +95,31 @@ class OpenAITranslator(TranslatorBackend):
             logger.error(f"OpenAI 翻译失败: {e}")
             return text
 
+    async def translate_stream_async(self, text: str):
+        """流式翻译，逐 token 产出（异步）"""
+        if not text.strip() or self._client is None:
+            return
+        try:
+            from openai import AsyncOpenAI
+            aclient = AsyncOpenAI(
+                api_key=self._client.api_key,
+                base_url=str(self._client.base_url),
+            )
+            stream = await aclient.chat.completions.create(
+                model=self._model, max_tokens=config.translator.max_tokens,
+                temperature=config.translator.temperature, stream=True,
+                messages=[
+                    {"role": "system", "content": config.translator.system_prompt},
+                    {"role": "user", "content": text},
+                ],
+            )
+            async for chunk in stream:
+                token = chunk.choices[0].delta.content or ""
+                if token:
+                    yield token
+        except Exception as e:
+            logger.debug(f"流式翻译异常: {e}")
+
 
 def create_translator(provider: str = "") -> TranslatorBackend:
     """工厂：按配置或自动检测可用 API key"""
