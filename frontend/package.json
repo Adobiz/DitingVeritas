@@ -29,6 +29,7 @@
   "build": {
     "appId": "com.diting.veritas",
     "productName": "DitingVeritas",
+    "icon": "assets/icon3.png",
     "directories": { "output": "release" },
     "win": { "target": "portable", "sign": false },
     "forceCodeSigning": false

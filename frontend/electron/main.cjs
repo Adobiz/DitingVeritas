@@ -5,6 +5,13 @@ let ctrlWin = null, tray = null, isQuitting = false;
 const BALL = 48, BAR_W = 360, BAR_H = 200;
 
 let iconIdle = null, iconActive = null;
+const fs = require("fs");
+
+function loadPNG(name) {
+  const p = path.join(__dirname, "../assets", name);
+  try { if (fs.existsSync(p)) return nativeImage.createFromPath(p); } catch {}
+  return null;
+}
 
 function makeIcon(r, g, b) {
   const size = 16, buf = Buffer.alloc(size * size * 4);
@@ -18,8 +25,8 @@ function makeIcon(r, g, b) {
 }
 
 function createTray() {
-  iconIdle = makeIcon(107, 114, 128);    // 灰色 = 休息中
-  iconActive = makeIcon(59, 130, 246);   // 蓝色 = 翻译中
+  iconIdle = loadPNG("icon-idle.png") || makeIcon(107, 114, 128);
+  iconActive = loadPNG("icon-active.png") || makeIcon(59, 130, 246);
   tray = new Tray(iconIdle);
   tray.setToolTip("谛听·译真");
   tray.setContextMenu(Menu.buildFromTemplate([
@@ -33,6 +40,7 @@ function createTray() {
 function createWindow() {
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
   ctrlWin = new BrowserWindow({
+    icon: loadPNG("icon.png") || makeIcon(59, 130, 246),
     width: BALL, height: BALL,
     x: sw - BALL - 16, y: Math.round(sh * 0.35),
     frame: false, transparent: true, alwaysOnTop: true,
