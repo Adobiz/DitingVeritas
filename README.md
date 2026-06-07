@@ -4,6 +4,10 @@ AI 同声传译助手 — 系统音频实时捕获 → VAD 切句 → ASR 识别
 
 <img src="assets/screenshot.png" alt="DitingVeritas" width="600" /> 
 
+## Video
+
+[![Install & Demo](https://img.shields.io/badge/Bilibili-Install%20%26%20Demo-00A1D6?logo=bilibili)](https://www.bilibili.com/video/BV1orE86hEto/)
+
 ## 快速开始
 
 ```bash
