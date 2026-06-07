@@ -57,6 +57,12 @@ function ControlBall() {
 
   const isRunning = status === "running";
   useEffect(() => { window.electronAPI?.setTrayActive(isRunning); }, [isRunning]);
+  useEffect(() => {
+    window.electronAPI?.onTrayCommand((cmd: string) => {
+      if (cmd === "start") handleStart();
+      else if (cmd === "stop") handleStop();
+    });
+  }, [connected, isRunning, deviceId, selectedModel, pipelineMode, lang]);
   const toggle = () => {
     if (expanded) window.electronAPI?.collapseControl();
     else window.electronAPI?.expandControl();
