@@ -373,6 +373,17 @@ async def translate_websocket(ws: WebSocket):
                 if data.get("api_base_url"): config.translator.openai_base_url = data["api_base_url"]
                 if data.get("model"): config.translator.model = data["model"]
                 if data.get("pipeline_mode"): config.pipeline_mode = data["pipeline_mode"]
+                if data.get("gpu"):
+                    import torch
+                    if torch.cuda.is_available():
+                        config.asr.device = "cuda"
+                        config.asr.compute_type = "float16"
+                    else:
+                        config.asr.device = "cpu"
+                        config.asr.compute_type = "int8"
+                else:
+                    config.asr.device = "cpu"
+                    config.asr.compute_type = "int8"
                 pipeline = TranslationPipeline(ws)
                 await pipeline.start(req)
                 state.status = PipelineStatus.RUNNING
@@ -400,6 +411,16 @@ async def translate_websocket(ws: WebSocket):
 
 @app.get("/api/health")
 async def health(): return {"status": "ok"}
+
+
+@app.get("/api/gpu")
+async def gpu_status():
+    try:
+        import torch
+        cuda = torch.cuda.is_available()
+        return {"cuda": cuda, "device": "cuda" if cuda else "cpu"}
+    except Exception:
+        return {"cuda": False, "device": "cpu"}
 
 
 @app.get("/api/devices")

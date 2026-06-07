@@ -29,6 +29,8 @@ function ControlBall() {
   const [showControls, setShowControls] = useState(true);
   const [ctxUrl, setCtxUrl] = useState("");
   const [ctxKeywords, setCtxKeywords] = useState("");
+  const [gpu, setGpu] = useState(false);
+  const [gpuAvailable, setGpuAvailable] = useState(false);
   const [pipelineMode, setPipelineMode] = useState<string>(() => localStorage.getItem("dv_mode") || "balanced");
   const modes = ["turbo", "balanced", "stable"];
   const modeLabel: Record<string, string> = { turbo: "强化", balanced: "均衡", stable: "稳定" };
@@ -53,7 +55,10 @@ function ControlBall() {
   const fetchDevices = async () => {
     try { const res = await fetch("http://127.0.0.1:8765/api/devices"); setDevices(await res.json()); } catch {}
   };
-  useEffect(() => { fetchDevices(); }, [connected]);
+  const fetchGpu = async () => {
+    try { const res = await fetch("http://127.0.0.1:8765/api/gpu"); const d = await res.json(); setGpuAvailable(d.cuda); } catch {}
+  };
+  useEffect(() => { fetchDevices(); fetchGpu(); }, [connected]);
 
   const isRunning = status === "running";
   useEffect(() => { window.electronAPI?.setTrayActive(isRunning); }, [isRunning]);
@@ -73,7 +78,7 @@ function ControlBall() {
   const handleStart = () => {
     const m = models.find((m) => m.id === selectedModel);
     send({ type: "start", device_index: deviceId ? Number(deviceId) : undefined,
-      model: m?.model, api_key: m?.key, api_base_url: m?.url, pipeline_mode: pipelineMode, source_lang: lang });
+      model: m?.model, api_key: m?.key, api_base_url: m?.url, pipeline_mode: pipelineMode, source_lang: lang, gpu: gpu });
   };
   const handleStop = () => send({ type: "stop" });
   const cycleMode = () => { if (isRunning) return; const i = modes.indexOf(pipelineMode); setPipelineMode(modes[(i+1)%3]); localStorage.setItem("dv_mode", modes[(i+1)%3]); };
@@ -136,6 +141,12 @@ function ControlBall() {
           <Row label="后端" value={WS} />
           <Row label="连接" value={connected ? "已连接" : "离线"} color={connected ? pc : "#ef4444"} />
           <Row label="状态" value={isRunning ? "运行中" : "休息中"} />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 12 }}>🚀 GPU 加速</span>
+            <input type="checkbox" checked={gpu} disabled={!gpuAvailable || isRunning} onChange={(e) => setGpu(e.target.checked)}
+              style={{ accentColor: pc, cursor: !gpuAvailable ? "not-allowed" : isRunning ? "not-allowed" : "pointer", opacity: gpuAvailable ? 1 : 0.3 }}
+              title={!gpuAvailable ? "未检测到 GPU" : isRunning ? "运行中不可切换" : gpu ? "GPU 加速 (float16)" : "CPU 模式 (int8)"} />
+          </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
             <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, flexShrink: 0 }}>音频源</span>
             <DeviceSelect devices={devices} deviceId={deviceId} setDeviceId={setDeviceId} onOpen={()=>{}} disabled={isRunning} />
