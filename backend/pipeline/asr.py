@@ -65,16 +65,41 @@ class LocalASR(ASRBackend):
 # ── 云端后端：阿里云实时 ASR ────────────────────
 
 class CloudASR(ASRBackend):
-    def __init__(self, app_key: str = "", token: str = ""):
+    def __init__(self, app_key: str = "", access_key: str = "", access_secret: str = ""):
         self._app_key = app_key
-        self._token = token
+        self._access_key = access_key
+        self._access_secret = access_secret
 
-    def configure(self, app_key: str, token: str):
+    def configure(self, app_key: str, access_key: str, access_secret: str):
         self._app_key = app_key
-        self._token = token
+        self._access_key = access_key
+        self._access_secret = access_secret
+
+    def _get_token(self) -> str:
+        try:
+            import json
+            from aliyunsdkcore.client import AcsClient
+            from aliyunsdkcore.request import CommonRequest
+            client = AcsClient(self._access_key, self._access_secret, "cn-shanghai")
+            request = CommonRequest()
+            request.set_method("POST")
+            request.set_domain("nls-meta.cn-shanghai.aliyuncs.com")
+            request.set_version("2019-02-28")
+            request.set_action_name("CreateToken")
+            response = client.do_action_with_exception(request)
+            return json.loads(response).get("Token", {}).get("Id", "")
+        except ImportError:
+            logger.error("未安装 aliyun-python-sdk-core，请 pip install aliyun-python-sdk-core")
+            return ""
+        except Exception as e:
+            logger.error(f"获取阿里云 Token 失败: {e}")
+            return ""
 
     def transcribe(self, audio: np.ndarray) -> list[dict]:
-        if not self._app_key or not self._token:
+        if not self._app_key:
+            return []
+        token = self._get_token()
+        if not token:
             return []
         try:
             import json, threading, time
@@ -84,7 +109,7 @@ class CloudASR(ASRBackend):
             results = []
             done = threading.Event()
 
-            url = f"wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1?token={self._token}"
+            url = f"wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1?token={token}"
             ws = websocket.WebSocketApp(url)
 
             def on_open(ws_obj):
@@ -141,7 +166,9 @@ class CloudASR(ASRBackend):
 def create_asr(provider: str = "") -> ASRBackend:
     p = provider or config.asr_provider.provider
     if p == "cloud":
-        return CloudASR(config.asr_provider.aliyun_app_key, config.asr_provider.aliyun_token)
+        return CloudASR(config.asr_provider.aliyun_app_key,
+                        config.asr_provider.aliyun_access_key,
+                        config.asr_provider.aliyun_access_secret)
     return LocalASR()
 
 

@@ -37,7 +37,8 @@ class ASRConfig:
 class ASRProviderConfig:
     provider: str = field(default_factory=lambda: os.getenv("ASR_PROVIDER", "local"))
     aliyun_app_key: str = field(default_factory=lambda: os.getenv("ALIYUN_APP_KEY", ""))
-    aliyun_token: str = field(default_factory=lambda: os.getenv("ALIYUN_TOKEN", ""))
+    aliyun_access_key: str = field(default_factory=lambda: os.getenv("ALIYUN_ACCESS_KEY", ""))
+    aliyun_access_secret: str = field(default_factory=lambda: os.getenv("ALIYUN_ACCESS_SECRET", ""))
 
 
 @dataclass
