@@ -5,13 +5,12 @@ interface ElectronAPI {
   collapseControl: () => Promise<void>;
   setHeight: (h: number) => Promise<void>;
   setTrayActive: (active: boolean) => Promise<void>;
+  openExternal: (url: string) => Promise<void>;
   close: () => Promise<void>;
 }
 declare global { interface Window { electronAPI?: ElectronAPI } }
 
 import "react";
-declare module "react" {
-  interface CSSProperties { WebkitAppRegion?: string }
-}
+declare module "react" { interface CSSProperties { WebkitAppRegion?: string } }
 
 export {};
