@@ -69,6 +69,7 @@ class Config:
     asr_provider: ASRProviderConfig = field(default_factory=ASRProviderConfig)
     translator: TranslatorConfig = field(default_factory=TranslatorConfig)
     context: ContextConfig = field(default_factory=ContextConfig)
+    pipeline_mode: str = field(default_factory=lambda: os.getenv("PIPELINE_MODE", "balanced"))
 
 
 config = Config()
