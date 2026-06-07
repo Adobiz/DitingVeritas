@@ -163,10 +163,46 @@ class TranslationPipeline:
         except Exception as e:
             logger.debug(f"翻译异常: {e}")
 
+    async def _run_stable(self, loop, mode):
+        """稳定：后台低频缓存 ASR，final 直接翻译"""
+        from time import monotonic as _clock
+        buf = []
+        last_asr = 0.0
+        max_s = int(mode.asr_buffer_sec * 16000)
+
+        while self.status == PipelineStatus.RUNNING:
+            try: chunk, rms = await asyncio.wait_for(self._queue.get(), timeout=0.5)
+            except asyncio.TimeoutError: continue
+            if self.status != PipelineStatus.RUNNING: break
+            try: segments = self._vad.process(chunk)
+            except Exception: continue
+
+            if self._vad.is_speaking:
+                buf.append(chunk)
+                while sum(len(c) for c in buf) > max_s and len(buf) > 1: buf.pop(0)
+
+            for seg in segments:
+                audio = seg.get("audio")
+                if audio is None or len(audio) == 0: continue
+                buf = []
+                if len(audio) > max_s: audio = audio[-max_s:]
+                try: results = await loop.run_in_executor(None, self._asr.transcribe, audio)
+                except Exception: continue
+                if not results: continue
+                text = " ".join(r["text"] for r in results)
+                logger.info(f"ASR(final): {text[:80]}")
+                try: t = await self._translator.translate_async(text)
+                except Exception: t = text
+                await self._send(ServerMessage.translation(
+                    TranslationResult(source_text=text, translation=t or text, is_partial=False)))
+
     async def _run(self):
         loop = asyncio.get_running_loop()
         mode_name = getattr(config, "pipeline_mode", "balanced") or "balanced"
         mode = get_mode(mode_name)
+        if mode_name == "stable":
+            await self._run_stable(loop, mode)
+            return
         logger.info(f"模式: {mode.label} (int={mode.asr_interval}s buf={mode.asr_buffer_sec}s sil={mode.vad_silence_ms}ms)")
 
         from time import monotonic as _clock
@@ -202,18 +238,15 @@ class TranslationPipeline:
 
                 now = _clock()
                 if now - last_infer >= mode.asr_interval:
-                    last_infer = now
                     if self._infer_task and not self._infer_task.done():
                         if mode.drop_stale: continue
-                        try: await asyncio.wait_for(self._infer_task, timeout=0.1)
-                        except asyncio.TimeoutError: continue
+                        self._infer_task.cancel()  # 直接取消，不等待
 
                     audio = np.concatenate(buf)
                     if len(audio) >= min_s:
+                        last_infer = now  # 成功启动才刷新
                         self._infer_task = asyncio.create_task(
                             self._infer_only(loop, audio[-max_s:]))
-            elif not mode.show_interim:
-                buf = []
 
             # ── ASR 完成 ──
             if self._infer_task and self._infer_task.done():
@@ -222,7 +255,9 @@ class TranslationPipeline:
                 self._infer_task = None
                 if text and isinstance(text, str) and text.strip():
                     logger.debug(f"ASR: {text[:60]}")
-                    if mode.show_interim:
+                    if mode_name == "stable":
+                        self._incr.process(text)  # 后台预热，不发前端
+                    elif mode.show_interim:
                         if mode_name == "turbo":
                             # 极简路径：直接发原文 + 异步翻译
                             await self._send(ServerMessage.translation(
