@@ -138,6 +138,10 @@ class TranslationPipeline:
                 audio = seg.get("audio")
                 if audio is None or len(audio) == 0:
                     continue
+                # 截断到最近 6s，加快 ASR
+                max_samples = 6 * 16000
+                if len(audio) > max_samples:
+                    audio = audio[-max_samples:]
                 try:
                     results = await loop.run_in_executor(None, self._asr.transcribe, audio)
                 except Exception as e:
