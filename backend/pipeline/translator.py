@@ -162,6 +162,10 @@ class OpenAITranslator(TranslatorBackend):
 
 def create_translator(provider: str = "") -> TranslatorBackend:
     """工厂：按配置或自动检测可用 API key"""
+    if config.translator.local_path:
+        from pipeline.local_translator import LocalTranslator
+        logger.info(f"使用本地翻译模型: {config.translator.local_path}")
+        return LocalTranslator(config.translator.local_path)
     provider = provider or config.translator.provider
     if provider == "claude":
         return ClaudeTranslator()
