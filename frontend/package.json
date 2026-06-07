@@ -31,6 +31,9 @@
     "productName": "DitingVeritas",
     "icon": "assets/icon3.png",
     "directories": { "output": "release" },
+    "extraResources": [
+      { "from": "../backend/dist/diting-backend.exe", "to": "backend/diting-backend.exe" }
+    ],
     "win": { "target": "portable", "sign": false },
     "forceCodeSigning": false
   }
