@@ -17,7 +17,7 @@ function ControlBall() {
   const [theme, setTheme] = useState(() => ({ primaryColor: "#9ca3af", bgOpacity: 0.78, brightness: 1.0, ...loadTheme() }));
   const [devices, setDevices] = useState<{ id: number; name: string }[]>([]);
   const [deviceId, setDeviceId] = useState("");
-  const [models, setModels] = useState<{ id: string; label: string; key: string; url: string; model: string }[]>(
+  const [models, setModels] = useState<{ id: string; label: string; key: string; url: string; model: string; local_path: string }[]>(
     () => { try { return JSON.parse(localStorage.getItem("dv_models") || "[]"); } catch { return []; } }
   );
   const [selectedModel, setSelectedModel] = useState("");
@@ -29,6 +29,8 @@ function ControlBall() {
   const [showControls, setShowControls] = useState(true);
   const [ctxUrl, setCtxUrl] = useState("");
   const [ctxKeywords, setCtxKeywords] = useState("");
+  const [gpu, setGpu] = useState(false);
+  const [gpuAvailable, setGpuAvailable] = useState(false);
   const [pipelineMode, setPipelineMode] = useState<string>(() => localStorage.getItem("dv_mode") || "balanced");
   const modes = ["turbo", "balanced", "stable"];
   const modeLabel: Record<string, string> = { turbo: "强化", balanced: "均衡", stable: "稳定" };
@@ -47,13 +49,23 @@ function ControlBall() {
       if (msg.payload.source_text) setSource(msg.payload.source_text);
       if (msg.payload.translation) setTranslation(msg.payload.translation);
     }
+    if (msg.type === "correction") {
+      if (msg.payload.new_translation) {
+        setTranslation(msg.payload.new_translation);
+        setToast("已自动修正翻译");
+        setTimeout(() => setToast(""), 2000);
+      }
+    }
   }, []);
   const { connected, status, send, connect } = useWebSocket({ url: WS, onMessage: onMsg });
 
   const fetchDevices = async () => {
     try { const res = await fetch("http://127.0.0.1:8765/api/devices"); setDevices(await res.json()); } catch {}
   };
-  useEffect(() => { fetchDevices(); }, [connected]);
+  const fetchGpu = async () => {
+    try { const res = await fetch("http://127.0.0.1:8765/api/gpu"); const d = await res.json(); setGpuAvailable(d.cuda); } catch {}
+  };
+  useEffect(() => { fetchDevices(); fetchGpu(); }, [connected]);
 
   const isRunning = status === "running";
   useEffect(() => { window.electronAPI?.setTrayActive(isRunning); }, [isRunning]);
@@ -73,7 +85,7 @@ function ControlBall() {
   const handleStart = () => {
     const m = models.find((m) => m.id === selectedModel);
     send({ type: "start", device_index: deviceId ? Number(deviceId) : undefined,
-      model: m?.model, api_key: m?.key, api_base_url: m?.url, pipeline_mode: pipelineMode, source_lang: lang });
+      model: m?.model, api_key: m?.key, api_base_url: m?.url, local_path: m?.local_path, pipeline_mode: pipelineMode, source_lang: lang, gpu: gpu });
   };
   const handleStop = () => send({ type: "stop" });
   const cycleMode = () => { if (isRunning) return; const i = modes.indexOf(pipelineMode); setPipelineMode(modes[(i+1)%3]); localStorage.setItem("dv_mode", modes[(i+1)%3]); };
@@ -136,6 +148,12 @@ function ControlBall() {
           <Row label="后端" value={WS} />
           <Row label="连接" value={connected ? "已连接" : "离线"} color={connected ? pc : "#ef4444"} />
           <Row label="状态" value={isRunning ? "运行中" : "休息中"} />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 12 }}>🚀 GPU 加速</span>
+            <input type="checkbox" checked={gpu} disabled={!gpuAvailable || isRunning} onChange={(e) => setGpu(e.target.checked)}
+              style={{ accentColor: pc, cursor: !gpuAvailable ? "not-allowed" : isRunning ? "not-allowed" : "pointer", opacity: gpuAvailable ? 1 : 0.3 }}
+              title={!gpuAvailable ? "未检测到 GPU" : isRunning ? "运行中不可切换" : gpu ? "GPU 加速 (float16)" : "CPU 模式 (int8)"} />
+          </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
             <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, flexShrink: 0 }}>音频源</span>
             <DeviceSelect devices={devices} deviceId={deviceId} setDeviceId={setDeviceId} onOpen={()=>{}} disabled={isRunning} />
@@ -221,14 +239,15 @@ const optStyle = (name: string, active: boolean): React.CSSProperties => ({ padd
 const Row = ({ label, value, color }: { label: string; value: string; color?: string }) => (<div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: "rgba(255,255,255,0.45)" }}>{label}</span><span style={{ color: color || "rgba(255,255,255,0.7)" }}>{value}</span></div>);
 const inputStyle: React.CSSProperties = { padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 11, outline: "none", width: "100%" };
 
-function AddModelForm({ onAdd }: { onAdd: (m: { id: string; label: string; key: string; url: string; model: string }) => void }) {
-  const [label, setLabel] = useState(""); const [key, setKey] = useState(""); const [url, setUrl] = useState(""); const [model, setModel] = useState("");
-  const submit = () => { if (!label || !key) return; onAdd({ id: Date.now().toString(36), label, key, url, model }); };
+function AddModelForm({ onAdd }: { onAdd: (m: { id: string; label: string; key: string; url: string; model: string; local_path: string }) => void }) {
+  const [label, setLabel] = useState(""); const [key, setKey] = useState(""); const [url, setUrl] = useState(""); const [model, setModel] = useState(""); const [localPath, setLocalPath] = useState("");
+  const submit = () => { if (!label || (!key && !localPath)) return; onAdd({ id: Date.now().toString(36), label, key, url, model, local_path: localPath }); };
   return (<div style={{ padding: 8, borderRadius: 6, background: "rgba(255,255,255,0.03)" }}>
-    <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="名称 (如 DeepSeek)" style={inputStyle} />
-    <input value={key} onChange={(e) => setKey(e.target.value)} placeholder="API Key" type="password" style={inputStyle} />
+    <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="名称 (如 NLLB-200)" style={inputStyle} />
+    <input value={key} onChange={(e) => setKey(e.target.value)} placeholder="API Key (云端模型)" type="password" style={inputStyle} />
     <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="API Base URL (可选)" style={inputStyle} />
     <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="Model (可选)" style={inputStyle} />
+    <input value={localPath} onChange={(e) => setLocalPath(e.target.value)} placeholder="本地模型路径 (可选，如 ./models/nllb)" style={{ ...inputStyle, borderColor: localPath ? "rgba(74,222,128,0.3)" : undefined }} />
     <button onClick={submit} style={{ width: "100%", padding: "5px 0", border: "none", borderRadius: 6, background: "#4ade80", color: "#000", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>添加</button>
   </div>);
 }

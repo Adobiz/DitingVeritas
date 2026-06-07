@@ -25,7 +25,7 @@ def _get_local_model():
     if _local_model is None:
         from faster_whisper import WhisperModel
         _local_model = WhisperModel(
-            config.asr.model_size, device="cpu",
+            config.asr.model_size, device=config.asr.device,
             compute_type=config.asr.compute_type,
         )
         logger.info(f"faster-whisper 就绪 (size={config.asr.model_size})")

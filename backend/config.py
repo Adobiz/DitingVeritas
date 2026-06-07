@@ -26,8 +26,9 @@ class VADConfig:
 
 @dataclass
 class ASRConfig:
-    model_size: str = "small"
+    model_size: str = "tiny"
     compute_type: str = "int8"
+    device: str = "cpu"
     language: str = "en"
     beam_size: int = 5
     vad_filter: bool = False  # 由外部 VAD 模块处理
@@ -60,6 +61,7 @@ class TranslatorConfig:
     openai_api_key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
     openai_base_url: str = field(default_factory=lambda: os.getenv("OPENAI_BASE_URL", ""))
     anthropic_api_key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
+    local_path: str = ""
 
 
 @dataclass
