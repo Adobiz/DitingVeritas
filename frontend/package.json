@@ -34,7 +34,14 @@
     "extraResources": [
       { "from": "../backend/dist/diting-backend.exe", "to": "backend/diting-backend.exe" }
     ],
-    "win": { "target": "portable", "sign": false },
+    "win": {
+      "target": "portable",
+      "sign": false,
+      "extraFiles": [{
+        "from": "node_modules/electron/dist/ffmpeg.dll",
+        "to": "./ffmpeg.dll"
+      }]
+    },
     "forceCodeSigning": false
   }
 }
