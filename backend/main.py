@@ -104,7 +104,11 @@ class TranslationPipeline:
         seq = 0
 
         async def _translate_and_send(src: str, s: int):
-            """异步翻译，不阻塞 ASR"""
+            """异步翻译，先推原文再推译文"""
+            # 立刻推原文（is_partial=True，前端显示英文）
+            await self._send(ServerMessage.translation(
+                TranslationResult(source_text=src, translation="", is_partial=True,
+                                  segment_id=str(s))))
             try:
                 t = await self._translator.translate_async(src)
             except Exception:
@@ -113,6 +117,7 @@ class TranslationPipeline:
                 logger.info(f"翻译: {t[:50]}")
             else:
                 logger.warning("翻译回退原文，请检查 API key 或网络")
+            # 译文就绪（is_partial=False，前端替换为中文）
             await self._send(ServerMessage.translation(
                 TranslationResult(source_text=src, translation=t, is_partial=False,
                                   segment_id=str(s))))
