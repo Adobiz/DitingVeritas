@@ -31,11 +31,11 @@ MODES = {
     ),
     "balanced": PipelineMode(
         label="均衡",
-        asr_interval=0.5,
-        asr_buffer_sec=6,
-        vad_silence_ms=800,
-        translate_debounce_ms=300,
-        min_words=3,
+        asr_interval=0.35,
+        asr_buffer_sec=4,
+        vad_silence_ms=600,
+        translate_debounce_ms=150,
+        min_words=2,
         context_len=3,
         show_interim=True,
         drop_stale=True,
@@ -43,13 +43,13 @@ MODES = {
     ),
     "stable": PipelineMode(
         label="稳定",
-        asr_interval=0.8,
-        asr_buffer_sec=10,
-        vad_silence_ms=1000,
-        translate_debounce_ms=400,
-        min_words=5,
-        context_len=5,
-        show_interim=False,
+        asr_interval=0.5,          # 后台频繁推理，翻译预热
+        asr_buffer_sec=8,          # 够完整句子，推理更快
+        vad_silence_ms=700,        # 比均衡保守，比原来快
+        translate_debounce_ms=200, # 句子完整，debounce 可短
+        min_words=3,               # 短句及时翻
+        context_len=5,             # 保留 5 句上下文
+        show_interim=False,        # 前端不闪，后台仍预热
         drop_stale=False,
         fallback_original=True,
     ),

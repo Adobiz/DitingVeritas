@@ -165,11 +165,11 @@ class TranslationPipeline:
 
     async def _run(self):
         loop = asyncio.get_running_loop()
-        mode = get_mode(getattr(config, "pipeline_mode", "balanced") or "balanced")
+        mode_name = getattr(config, "pipeline_mode", "balanced") or "balanced"
+        mode = get_mode(mode_name)
         logger.info(f"模式: {mode.label} (int={mode.asr_interval}s buf={mode.asr_buffer_sec}s sil={mode.vad_silence_ms}ms)")
 
         from time import monotonic as _clock
-        inc = self._IncASR(self._asr, loop)
         buf, last_infer, seq = [], 0.0, 0
         pending, last_quality = [], None
         max_s = int(mode.asr_buffer_sec * 16000)
@@ -211,29 +211,41 @@ class TranslationPipeline:
                     audio = np.concatenate(buf)
                     if len(audio) >= min_s:
                         self._infer_task = asyncio.create_task(
-                            inc.delta(audio[-max_s:]))
+                            self._infer_only(loop, audio[-max_s:]))
             elif not mode.show_interim:
                 buf = []
 
-            # ── ASR 完成 → 增量 diff + 翻译 ──
+            # ── ASR 完成 ──
             if self._infer_task and self._infer_task.done():
                 try: text = self._infer_task.result()
                 except Exception: text = None
                 self._infer_task = None
                 if text and isinstance(text, str) and text.strip():
-                    delta = self._incr.process(text)
-                    if delta:
-                        logger.debug(f"ASR delta: {delta['delta'][:40]} ({delta['type']})")
-                        self._interim_seq += 1
-                        if self._interim_tl_task and not self._interim_tl_task.done() and mode.drop_stale:
-                            self._interim_tl_task.cancel()
-                        if delta["type"] == "append" and mode.show_interim:
+                    logger.debug(f"ASR: {text[:60]}")
+                    if mode.show_interim:
+                        if mode_name == "turbo":
+                            # 极简路径：直接发原文 + 异步翻译
+                            await self._send(ServerMessage.translation(
+                                TranslationResult(source_text=text, translation="", is_partial=True)))
+                            self._interim_seq += 1
+                            if self._interim_tl_task and not self._interim_tl_task.done():
+                                self._interim_tl_task.cancel()
                             self._interim_tl_task = asyncio.create_task(
-                                self._tl_delta(delta["delta"], mode, self._interim_seq, delta["full"]))
-                        elif delta["type"] == "correct" and mode.show_interim:
-                            self._confirmed_tl = ""
-                            self._interim_tl_task = asyncio.create_task(
-                                self._tl_delta(delta["delta"], mode, self._interim_seq, delta["full"]))
+                                self._tl_stream(text, mode, self._interim_seq, loop))
+                        else:
+                            # 均衡/稳定：增量 diff
+                            delta = self._incr.process(text)
+                            if delta:
+                                self._interim_seq += 1
+                                if self._interim_tl_task and not self._interim_tl_task.done() and mode.drop_stale:
+                                    self._interim_tl_task.cancel()
+                                if delta["type"] == "append":
+                                    self._interim_tl_task = asyncio.create_task(
+                                        self._tl_delta(delta["delta"], mode, self._interim_seq, delta["full"]))
+                                elif delta["type"] == "correct":
+                                    self._confirmed_tl = ""
+                                    self._interim_tl_task = asyncio.create_task(
+                                        self._tl_delta(delta["delta"], mode, self._interim_seq, delta["full"]))
 
 
             # ── VAD final ──
