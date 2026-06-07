@@ -2,6 +2,7 @@ const { app, BrowserWindow, Tray, Menu, screen, ipcMain, nativeImage } = require
 const path = require("path");
 
 let ctrlWin = null, tray = null, isQuitting = false;
+let pipelineActive = false;
 const BALL = 48, BAR_W = 360, BAR_H = 200;
 
 let iconIdle = null, iconActive = null;
@@ -24,16 +25,25 @@ function makeIcon(r, g, b) {
   return nativeImage.createFromBuffer(buf, { width: size, height: size, scaleFactor: 1.0 });
 }
 
+function buildTrayMenu() {
+  return Menu.buildFromTemplate([
+    { label: "显示/隐藏", click: () => ctrlWin?.isVisible() ? ctrlWin.hide() : ctrlWin?.show() },
+    { type: "separator" },
+    {
+      label: pipelineActive ? "■ 停止翻译" : "▶ 开始翻译",
+      click: () => { ctrlWin?.webContents.send("tray-command", pipelineActive ? "stop" : "start"); }
+    },
+    { type: "separator" },
+    { label: "退出", click: () => { isQuitting = true; app.quit(); } },
+  ]);
+}
+
 function createTray() {
   iconIdle = loadPNG("icon-idle.png") || makeIcon(107, 114, 128);
   iconActive = loadPNG("icon-active.png") || makeIcon(59, 130, 246);
   tray = new Tray(iconIdle);
   tray.setToolTip("谛听·译真");
-  tray.setContextMenu(Menu.buildFromTemplate([
-    { label: "显示/隐藏", click: () => ctrlWin?.isVisible() ? ctrlWin.hide() : ctrlWin?.show() },
-    { type: "separator" },
-    { label: "退出", click: () => { isQuitting = true; app.quit(); } },
-  ]));
+  tray.setContextMenu(buildTrayMenu());
   tray.on("double-click", () => ctrlWin?.isVisible() ? ctrlWin.hide() : ctrlWin?.show());
 }
 
@@ -70,7 +80,9 @@ ipcMain.handle("set-height", (_e, h) => {
   ctrlWin.setBounds({ x, y, width: BAR_W, height: h }, true);
 });
 ipcMain.handle("set-tray-active", (_e, active) => {
+  pipelineActive = active;
   tray?.setImage(active ? iconActive : iconIdle);
+  tray?.setContextMenu(buildTrayMenu());
 });
 ipcMain.handle("open-external", (_e, url) => { require("electron").shell.openExternal(url); });
 ipcMain.handle("close-window", () => ctrlWin?.hide());
