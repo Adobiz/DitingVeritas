@@ -97,8 +97,8 @@ function ControlBall() {
   if (!expanded) {
     return (
       <div style={{ width: "100%", height: "100%", userSelect: "none", WebkitAppRegion: "drag" }}>
-        <div onClick={toggle} style={{ width: 44, height: 44, borderRadius: "50%", background: bg(1), backdropFilter: "blur(10px)", border: `4px solid ${q}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", userSelect: "none", WebkitAppRegion: "no-drag", boxSizing: "border-box" }}>
-          <span style={{ fontSize: 20, fontWeight: 700, color: q, pointerEvents: "none" }}>谛</span>
+        <div onClick={toggle} style={{ width: 44, height: 44, borderRadius: "50%", background: bg(1), backdropFilter: "blur(10px)", border: `4px solid ${q}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", userSelect: "none", WebkitAppRegion: "no-drag", boxSizing: "border-box", transition: "border-color 0.3s, background 0.3s" }}>
+          <span style={{ fontSize: 20, fontWeight: 700, color: q, pointerEvents: "none", transition: "color 0.3s" }}>谛</span>
         </div>
       </div>
     );
@@ -129,7 +129,7 @@ function ControlBall() {
       )}
 
       {settings && (
-        <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: panelBg(theme.primaryColor), display: "flex", flexDirection: "column", gap: 6, fontSize: 12, WebkitAppRegion: "no-drag" }}>
+        <div style={{ marginTop: 10, padding: 10, borderRadius: 8, animation: "fadeIn 0.2s ease", background: panelBg(theme.primaryColor), display: "flex", flexDirection: "column", gap: 6, fontSize: 12, WebkitAppRegion: "no-drag" }}>
           <Row label="后端" value={WS} />
           <Row label="连接" value={connected ? "已连接" : "离线"} color={connected ? pc : "#ef4444"} />
           <Row label="状态" value={isRunning ? "运行中" : "休息中"} />
@@ -149,7 +149,7 @@ function ControlBall() {
       )}
 
       {showTheme && (
-        <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: panelBg(theme.primaryColor), display: "flex", flexDirection: "column", gap: 8, fontSize: 12, WebkitAppRegion: "no-drag" }}>
+        <div style={{ marginTop: 10, padding: 10, borderRadius: 8, animation: "fadeIn 0.2s ease", background: panelBg(theme.primaryColor), display: "flex", flexDirection: "column", gap: 8, fontSize: 12, WebkitAppRegion: "no-drag" }}>
           <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 11 }}>🎨 外观</span>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {PRESETS.map(c => (
@@ -212,4 +212,4 @@ function AddModelForm({ onAdd }: { onAdd: (m: { id: string; label: string; key: 
   </div>);
 }
 
-const btn = (bg: string): React.CSSProperties => ({ width: 32, height: 32, border: "none", borderRadius: 8, background: bg, color: "#fff", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" });
+const btn = (bg: string): React.CSSProperties => ({ width: 32, height: 32, border: "none", borderRadius: 8, background: bg, color: "#fff", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.2s, transform 0.15s, opacity 0.2s" });
