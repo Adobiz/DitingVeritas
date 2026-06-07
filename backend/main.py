@@ -100,7 +100,9 @@ class TranslationPipeline:
     async def _run(self):
         loop = asyncio.get_running_loop()
         last_quality = None
-        diag_n = 0
+        speech_buf = []
+        tick = 0
+        INTERVAL = 24  # ~1.5s (24 × 64ms)
 
         while self.status == PipelineStatus.RUNNING:
             try:
@@ -111,34 +113,52 @@ class TranslationPipeline:
             if self.status != PipelineStatus.RUNNING:
                 break
 
-            # 诊断：每 3 秒输出队列状态和 RMS
-            diag_n += 1
-            if diag_n % 120 == 1:
-                logger.info(f"[诊断] 队列≈{self._queue.qsize()}, RMS≈{rms:.4f}")
-
-            # VAD 切句
+            # VAD
             try:
                 segments = self._vad.process(chunk)
             except Exception as e:
                 logger.error(f"VAD 异常: {e}")
                 continue
 
+            # ── 流式 interim：说话中每 ~1.5s 出一版 ──
+            if self._vad.is_speaking:
+                speech_buf.append(chunk)
+                tick += 1
+                if tick >= INTERVAL:
+                    tick = 0
+                    interim_audio = np.concatenate(speech_buf)
+                    try:
+                        results = await loop.run_in_executor(None, self._asr.transcribe, interim_audio)
+                    except Exception:
+                        continue
+                    if results:
+                        text = " ".join(r["text"] for r in results)
+                        logger.debug(f"ASR(interim): {text[:80]}")
+                        await self._send(ServerMessage.translation(
+                            TranslationResult(source_text=text, translation="", is_partial=True)))
+                    # 只保留最近 3 秒
+                    sr = 16000
+                    keep = min(len(speech_buf), max(1, (3 * sr) // len(chunk)))
+                    speech_buf = speech_buf[-keep:]
+            else:
+                speech_buf = []
+                tick = 0
+
+            # ── VAD 切句 → final + 翻译 ──
             for seg in segments:
                 audio = seg.get("audio")
                 if audio is None or len(audio) == 0:
                     continue
-                # ASR（线程池异步执行）
                 try:
                     results = await loop.run_in_executor(None, self._asr.transcribe, audio)
                 except Exception as e:
                     logger.error(f"ASR 异常: {e}")
                     continue
-
                 if not results:
                     continue
 
                 text = " ".join(r["text"] for r in results)
-                logger.info(f"ASR: {text[:80]}")
+                logger.info(f"ASR(final): {text[:80]}")
 
                 translation = await self._translator.translate_async(text)
                 if translation != text:
@@ -147,8 +167,13 @@ class TranslationPipeline:
                     logger.warning("翻译回退原文，请检查 API key 或网络")
 
                 await self._send(ServerMessage.translation(
-                    TranslationResult(source_text=text, translation=translation, is_partial=False)
-                ))
+                    TranslationResult(source_text=text, translation=translation, is_partial=False)))
+                # final 后仍在说话则保留最近 chunk，否则清空
+                if self._vad.is_speaking:
+                    speech_buf = [chunk]
+                else:
+                    speech_buf = []
+                tick = 0
 
             # 音频质量推送
             quality = self._rms_quality(rms)

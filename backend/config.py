@@ -34,6 +34,13 @@ class ASRConfig:
 
 
 @dataclass
+class ASRProviderConfig:
+    provider: str = field(default_factory=lambda: os.getenv("ASR_PROVIDER", "local"))
+    aliyun_app_key: str = field(default_factory=lambda: os.getenv("ALIYUN_APP_KEY", ""))
+    aliyun_token: str = field(default_factory=lambda: os.getenv("ALIYUN_TOKEN", ""))
+
+
+@dataclass
 class TranslatorConfig:
     provider: str = field(default_factory=lambda: os.getenv("TRANSLATOR_PROVIDER", "auto"))
     model: str = field(default_factory=lambda: os.getenv("TRANSLATOR_MODEL", "auto"))
@@ -58,6 +65,7 @@ class Config:
     audio: AudioConfig = field(default_factory=AudioConfig)
     vad: VADConfig = field(default_factory=VADConfig)
     asr: ASRConfig = field(default_factory=ASRConfig)
+    asr_provider: ASRProviderConfig = field(default_factory=ASRProviderConfig)
     translator: TranslatorConfig = field(default_factory=TranslatorConfig)
     context: ContextConfig = field(default_factory=ContextConfig)
 
