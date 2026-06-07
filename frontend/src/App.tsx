@@ -27,6 +27,8 @@ function ControlBall() {
   const [source, setSource] = useState("");
   const [translation, setTranslation] = useState("");
   const [showControls, setShowControls] = useState(true);
+  const [ctxUrl, setCtxUrl] = useState("");
+  const [ctxKeywords, setCtxKeywords] = useState("");
   const [pipelineMode, setPipelineMode] = useState<string>(() => localStorage.getItem("dv_mode") || "balanced");
   const modes = ["turbo", "balanced", "stable"];
   const modeLabel: Record<string, string> = { turbo: "强化", balanced: "均衡", stable: "稳定" };
@@ -137,6 +139,14 @@ function ControlBall() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
             <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, flexShrink: 0 }}>音频源</span>
             <DeviceSelect devices={devices} deviceId={deviceId} setDeviceId={setDeviceId} onOpen={()=>{}} disabled={isRunning} />
+          </div>
+          <div style={{ marginTop: 4, padding: "6px 0", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+            <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 10 }}>📡 闻境（语境预加载）</span>
+            <input value={ctxUrl} onChange={(e) => setCtxUrl(e.target.value)} placeholder="URL（可选）" disabled={isRunning} style={{ ...inputStyle, marginTop: 4 }} />
+            <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+              <input value={ctxKeywords} onChange={(e) => setCtxKeywords(e.target.value)} placeholder="关键词，逗号分隔（可选）" disabled={isRunning} style={{ ...inputStyle, flex: 1 }} />
+              <button onClick={() => { send({ type: "context_update", url: ctxUrl, keywords: ctxKeywords.split(",").map((k: string) => k.trim()).filter(Boolean) }); setToast("语境已发送"); setTimeout(() => setToast(""), 2000); }} disabled={isRunning || !connected} style={{ padding: "4px 10px", border: "none", borderRadius: 6, background: isRunning || !connected ? "#374151" : pc, color: "#fff", fontSize: 11, cursor: isRunning || !connected ? "not-allowed" : "pointer", opacity: isRunning || !connected ? 0.4 : 1, whiteSpace: "nowrap" }}>发送</button>
+            </div>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
             <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, flexShrink: 0 }}>🌐 语言</span>
