@@ -25,6 +25,7 @@ from pipeline.asr import ASREngine
 from pipeline.translator import create_translator
 from pipeline.modes import get_mode
 from pipeline.incremental import IncrementalProcessor
+from pipeline.context_loader import load_context, build_context_block
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logger = logging.getLogger("diting")
@@ -62,8 +63,13 @@ class TranslationPipeline:
             self.target_lang = req.target_lang
             config.asr.language = req.source_lang  # 同步到 ASR 和翻译
             if req.context: self.context = req.context
+        ctx = load_context(self.context)
+        self._translator.context_block = build_context_block(ctx)
         self.status = PipelineStatus.STARTING
-        await self._push_status("管道启动中…")
+        if ctx:
+            await self._push_status(f"语境已加载: {ctx.topic[:30]}")
+        else:
+            await self._push_status("管道启动中…")
         self._vad.reset()
         self._audio.start(self._on_chunk)
         self._task = asyncio.create_task(self._run())
@@ -83,6 +89,7 @@ class TranslationPipeline:
         self._drain()
         for t in [self._interim_tl_task, self._infer_task]:
             if t and not t.done(): t.cancel()
+        self._translator.context_block = ""  # 清除语境
         self.status = PipelineStatus.IDLE
         await self._push_status("管道已停止")
 
@@ -376,7 +383,10 @@ async def translate_websocket(ws: WebSocket):
                 if pipeline:
                     try: pipeline.context = ContextUpdate(**data)
                     except Exception: pass
-                await ws.send_json(ServerMessage.status(StatusUpdate(status=state.status, message="语境已更新")).model_dump())
+                    ctx = load_context(pipeline.context)
+                    pipeline._translator.context_block = build_context_block(ctx)
+                    detail = f"语境已更新: {ctx.topic[:30]}" if ctx and ctx.topic else "语境已更新"
+                    await ws.send_json(ServerMessage.status(StatusUpdate(status=state.status, message=detail)).model_dump())
 
             else:
                 await ws.send_json(ServerMessage.error(ErrorMessage(code="UNKNOWN_TYPE", message=str(msg_type))).model_dump())

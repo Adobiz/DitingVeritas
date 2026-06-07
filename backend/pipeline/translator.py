@@ -10,6 +10,13 @@ logger = logging.getLogger("diting.translator")
 class TranslatorBackend(ABC):
     """翻译后端统一接口"""
 
+    context_block: str = ""  # 闻境注入块，由管道设置
+
+    def _build_system(self, base: str) -> str:
+        if self.context_block:
+            return base + "\n\n" + self.context_block
+        return base
+
     @abstractmethod
     def translate(self, text: str) -> str:
         ...
@@ -45,7 +52,7 @@ class ClaudeTranslator(TranslatorBackend):
                 model=self._model,
                 max_tokens=config.translator.max_tokens,
                 temperature=config.translator.temperature,
-                system=config.translator.system_prompt.replace("{src_lang}", LANG_NAMES.get(config.asr.language, "英文")),
+                system=self._build_system(config.translator.system_prompt.replace("{src_lang}", LANG_NAMES.get(config.asr.language, "英文"))),
                 messages=[{"role": "user", "content": text}],
             )
             return resp.content[0].text.strip()
@@ -86,7 +93,7 @@ class OpenAITranslator(TranslatorBackend):
                 max_tokens=config.translator.max_tokens,
                 temperature=config.translator.temperature,
                 messages=[
-                    {"role": "system", "content": config.translator.system_prompt.replace("{src_lang}", LANG_NAMES.get(config.asr.language, "英文"))},
+                    {"role": "system", "content": self._build_system(config.translator.system_prompt.replace("{src_lang}", LANG_NAMES.get(config.asr.language, "英文")))},
                     {"role": "user", "content": text},
                 ],
             )
@@ -109,7 +116,7 @@ class OpenAITranslator(TranslatorBackend):
                 model=self._model, max_tokens=config.translator.max_tokens,
                 temperature=config.translator.temperature, stream=True,
                 messages=[
-                    {"role": "system", "content": config.translator.system_prompt.replace("{src_lang}", LANG_NAMES.get(config.asr.language, "英文"))},
+                    {"role": "system", "content": self._build_system(config.translator.system_prompt.replace("{src_lang}", LANG_NAMES.get(config.asr.language, "英文")))},
                     {"role": "user", "content": text},
                 ],
             )
