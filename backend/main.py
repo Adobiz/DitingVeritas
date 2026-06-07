@@ -24,6 +24,7 @@ from pipeline.vad import VoiceActivityDetector
 from pipeline.asr import ASREngine
 from pipeline.translator import create_translator
 from pipeline.modes import get_mode
+from pipeline.incremental import IncrementalProcessor
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logger = logging.getLogger("diting")
@@ -50,6 +51,8 @@ class TranslationPipeline:
         self._infer_task: asyncio.Task | None = None
         self._last_infer_text = ""
         self._last_tl_text = ""
+        self._incr = IncrementalProcessor()
+        self._confirmed_tl = ""
 
     async def start(self, req: StartRequest | None = None):
         if self.status == PipelineStatus.RUNNING:
@@ -117,6 +120,28 @@ class TranslationPipeline:
             logger.debug(f"ASR 推理异常: {e}")
             return None
 
+    async def _tl_delta(self, delta_src: str, mode, seq_id: int, full_src: str):
+        """增量翻译：只翻新增文本"""
+        if not delta_src: return
+        await asyncio.sleep(mode.translate_debounce_ms / 1000.0)
+        if seq_id != self._interim_seq: return
+        try:
+            accumulated = ""
+            gen = self._translator.translate_stream_async(delta_src)
+            async for token in gen:
+                accumulated += token
+                await self._send(ServerMessage.translation(
+                    TranslationResult(source_text=full_src,
+                                      translation=self._confirmed_tl + accumulated,
+                                      is_partial=True)))
+            self._confirmed_tl += accumulated
+            await self._send(ServerMessage.translation(
+                TranslationResult(source_text=full_src,
+                                  translation=self._confirmed_tl,
+                                  is_partial=False)))
+        except Exception as e:
+            logger.debug(f"增量翻译异常: {e}")
+
     # ── 独立翻译任务 ─────────────────────────
 
     async def _tl_stream(self, text: str, mode, seq_id: int, loop):
@@ -151,6 +176,8 @@ class TranslationPipeline:
         min_s = int(0.3 * 16000)
 
         async def _tl_final(src: str, s: int):
+            self._incr.finalize(src)
+            self._confirmed_tl = ""
             try: t = await self._translator.translate_async(src)
             except Exception: t = src
             await self._send(ServerMessage.translation(
@@ -188,22 +215,26 @@ class TranslationPipeline:
             elif not mode.show_interim:
                 buf = []
 
-            # ── ASR 完成 → 启动翻译 ──
+            # ── ASR 完成 → 增量 diff + 翻译 ──
             if self._infer_task and self._infer_task.done():
                 try: text = self._infer_task.result()
                 except Exception: text = None
                 self._infer_task = None
-                if text and text != self._last_infer_text:
-                    self._last_infer_text = text
-                    logger.debug(f"ASR(interim): {text[:60]}")
-                    if mode.show_interim:
-                        await self._send(ServerMessage.translation(
-                            TranslationResult(source_text=text, translation="", is_partial=True)))
+                if text and isinstance(text, str) and text.strip():
+                    delta = self._incr.process(text)
+                    if delta:
+                        logger.debug(f"ASR delta: {delta['delta'][:40]} ({delta['type']})")
                         self._interim_seq += 1
                         if self._interim_tl_task and not self._interim_tl_task.done() and mode.drop_stale:
                             self._interim_tl_task.cancel()
-                        self._interim_tl_task = asyncio.create_task(
-                            self._tl_stream(text, mode, self._interim_seq, loop))
+                        if delta["type"] == "append" and mode.show_interim:
+                            self._interim_tl_task = asyncio.create_task(
+                                self._tl_delta(delta["delta"], mode, self._interim_seq, delta["full"]))
+                        elif delta["type"] == "correct" and mode.show_interim:
+                            self._confirmed_tl = ""
+                            self._interim_tl_task = asyncio.create_task(
+                                self._tl_delta(delta["delta"], mode, self._interim_seq, delta["full"]))
+
 
             # ── VAD final ──
             for seg in segments:
