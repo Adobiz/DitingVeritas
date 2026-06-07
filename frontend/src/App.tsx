@@ -4,7 +4,7 @@ import { toBgColor, panelBg } from "./colors";
 
 const WS = "ws://127.0.0.1:8765/ws/translate";
 
-const PRESETS = ["#9ca3af","#4ade80","#60a5fa","#f59e0b","#f472b6","#a78bfa","#34d399","#fb923c"];
+const PRESETS = ["#9ca3af","#4ade80","#60a5fa","#f59e0b","#f472b6","#a78bfa","#ef4444","#fb923c"];
 
 function loadTheme() { try { return JSON.parse(localStorage.getItem("dv_theme")||"{}"); } catch { return {}; } }
 
@@ -22,6 +22,7 @@ function ControlBall() {
   );
   const [selectedModel, setSelectedModel] = useState("");
   const [showAddModel, setShowAddModel] = useState(false);
+  const [lang, setLang] = useState(() => localStorage.getItem("dv_lang") || "en");
   const [toast, setToast] = useState("");
   const [source, setSource] = useState("");
   const [translation, setTranslation] = useState("");
@@ -61,7 +62,7 @@ function ControlBall() {
   };
   const toggleSettings = () => {
     const n = !settings; setSettings(n); setShowTheme(false);
-    window.electronAPI?.setHeight(n ? (showAddModel ? 560 : 460) : 200);
+    window.electronAPI?.setHeight(n ? (showAddModel ? 600 : 500) : 200);
   };
   const toggleTheme = () => {
     const n = !showTheme; setShowTheme(n); setSettings(false);
@@ -70,7 +71,7 @@ function ControlBall() {
   const handleStart = () => {
     const m = models.find((m) => m.id === selectedModel);
     send({ type: "start", device_index: deviceId ? Number(deviceId) : undefined,
-      model: m?.model, api_key: m?.key, api_base_url: m?.url, pipeline_mode: pipelineMode });
+      model: m?.model, api_key: m?.key, api_base_url: m?.url, pipeline_mode: pipelineMode, source_lang: lang });
   };
   const handleStop = () => send({ type: "stop" });
   const cycleMode = () => { if (isRunning) return; const i = modes.indexOf(pipelineMode); setPipelineMode(modes[(i+1)%3]); localStorage.setItem("dv_mode", modes[(i+1)%3]); };
@@ -85,7 +86,7 @@ function ControlBall() {
 
   useEffect(() => {
     if (!expanded) return;
-    if (settings) { window.electronAPI?.setHeight(showAddModel ? 560 : 460); return; }
+    if (settings) { window.electronAPI?.setHeight(showAddModel ? 600 : 500); return; }
     if (showTheme) { window.electronAPI?.setHeight(260); return; }
     if (!isRunning && !showControls) { window.electronAPI?.setHeight(80); return; }
     if (!isRunning) { window.electronAPI?.setHeight(200); return; }
@@ -138,6 +139,10 @@ function ControlBall() {
             <DeviceSelect devices={devices} deviceId={deviceId} setDeviceId={setDeviceId} onOpen={()=>{}} disabled={isRunning} />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+            <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, flexShrink: 0 }}>🌐 语言</span>
+            <LangSelect lang={lang} setLang={(v) => { setLang(v); localStorage.setItem("dv_lang", v); }} disabled={isRunning} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
             <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, flexShrink: 0 }}>选择模型</span>
             {models.length > 0 && <ModelSelect models={models} selected={selectedModel} onSelect={setSelectedModel} onDelete={handleDeleteModel} disabled={isRunning} />}
             <button onClick={()=>{if(isRunning)return;setShowAddModel(!showAddModel)}} disabled={isRunning} title={isRunning?"运行中不可添加":""} style={{...btn("#374151"),width:22,height:22,fontSize:16,borderRadius:4,flexShrink:0,opacity:isRunning?0.4:1}}>+</button>
@@ -179,9 +184,15 @@ function ModelSelect({ models, selected, onSelect, onDelete, disabled }: { model
     <div onClick={() => { if (disabled) return; setOpen(!open); }} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 6px", borderRadius: 6, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", fontSize: 11, color: "rgba(255,255,255,0.7)", width: "100%", opacity: disabled ? 0.4 : 1, cursor: disabled ? "not-allowed" : "pointer" }}>
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{cur?.label || "选择模型"}</span><span style={{ fontSize: 8, marginLeft: 4 }}>▼</span></div>
     {open && (<div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, maxHeight: 100, overflowY: "auto", scrollbarWidth: "none", background: "rgba(0,0,0,0.92)", backdropFilter: "blur(14px)", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", padding: 4, zIndex: 99 }}>
-      {models.map((m) => (<div key={m.id} style={{ display: "flex", alignItems: "center", ...optStyle(m.label, m.id === selected) }}><div onClick={() => { onSelect(m.id); setOpen(false); }} style={{ flex: 1 }}>{m.label}</div><span onClick={(e) => { e.stopPropagation(); onDelete(m.id); }} style={{ marginLeft: 6, cursor: "pointer", color: "rgba(255,255,255,0.3)", fontSize: 14, lineHeight: 1 }} title="删除">×</span></div>))}
+      {models.map((m) => (<div key={m.id} style={{ display: "flex", alignItems: "center", ...optStyle(m.label, m.id === selected) }}><div onClick={() => { onSelect(m.id); setOpen(false); }} style={{ flex: 1 }}>{m.label}</div><span onClick={(e) => { e.stopPropagation(); onDelete(m.id); }} style={{ marginLeft: 6, cursor: disabled ? "not-allowed" : "pointer", color: "rgba(255,255,255,0.3)", fontSize: 14, lineHeight: 1 }} title="删除">×</span></div>))}
     </div>)}
   </div>);
+}
+
+function LangSelect({ lang, setLang, disabled }: { lang: string; setLang: (v: string) => void; disabled?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const LS: Record<string,string> = { en:"English", zh:"中文", ja:"日本語", ko:"한국어", fr:"Français", de:"Deutsch", es:"Español", ru:"Русский", ar:"العربية", pt:"Português", it:"Italiano" };
+  return (<div style={{ position: "relative", WebkitAppRegion: "no-drag", flex: 1 }}><div onClick={() => { if (disabled) return; setOpen(!open); }} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 6px", borderRadius: 6, cursor: disabled ? "not-allowed" : "pointer", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", fontSize: 11, color: "rgba(255,255,255,0.7)", width: "100%", opacity: disabled ? 0.4 : 1 }}><span>{LS[lang]}</span><span style={{ fontSize: 8, marginLeft: 4 }}>▼</span></div>{open && (<div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, maxHeight: 100, overflowY: "auto", scrollbarWidth: "none", background: "rgba(0,0,0,0.92)", backdropFilter: "blur(14px)", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", padding: 4, zIndex: 99 }}>{Object.entries(LS).map(([k,v]) => (<div key={k} onClick={() => { setLang(k); setOpen(false); }} style={optStyle(v, k === lang)}>{v}</div>))}</div>)}</div>);
 }
 
 function DeviceSelect({ devices, deviceId, setDeviceId, onOpen, disabled }: { devices: { id: number; name: string }[]; deviceId: string; setDeviceId: (v: string) => void; onOpen: (open: boolean) => void; disabled?: boolean; }) {

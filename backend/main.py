@@ -60,6 +60,7 @@ class TranslationPipeline:
         if req:
             self.source_lang = req.source_lang
             self.target_lang = req.target_lang
+            config.asr.language = req.source_lang  # 同步到 ASR 和翻译
             if req.context: self.context = req.context
         self.status = PipelineStatus.STARTING
         await self._push_status("管道启动中…")
