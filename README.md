@@ -2,6 +2,8 @@
 
 AI 同声传译助手 — 系统音频实时捕获 → VAD 切句 → ASR 识别 → LLM 翻译 → 悬浮字幕呈现
 
+![DitingVeritas](assets/screenshot.png)
+
 ## 快速开始
 
 ```bash
