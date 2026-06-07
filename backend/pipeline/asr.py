@@ -65,114 +65,58 @@ class LocalASR(ASRBackend):
 # ── 云端后端：阿里云实时 ASR ────────────────────
 
 class CloudASR(ASRBackend):
-    def __init__(self, app_key: str = "", access_key: str = "", access_secret: str = ""):
+    def __init__(self, app_key: str = "", token: str = ""):
         self._app_key = app_key
-        self._access_key = access_key
-        self._access_secret = access_secret
+        self._token = token
 
-    def configure(self, app_key: str, access_key: str, access_secret: str):
+    def configure(self, app_key: str, token: str):
         self._app_key = app_key
-        self._access_key = access_key
-        self._access_secret = access_secret
-
-    def _get_token(self) -> str:
-        try:
-            import json
-            from aliyunsdkcore.client import AcsClient
-            from aliyunsdkcore.request import CommonRequest
-            client = AcsClient(self._access_key, self._access_secret, "cn-shanghai")
-            request = CommonRequest()
-            request.set_method("POST")
-            request.set_domain("nls-meta.cn-shanghai.aliyuncs.com")
-            request.set_version("2019-02-28")
-            request.set_action_name("CreateToken")
-            response = client.do_action_with_exception(request)
-            return json.loads(response).get("Token", {}).get("Id", "")
-        except ImportError:
-            logger.error("未安装 aliyun-python-sdk-core，请 pip install aliyun-python-sdk-core")
-            return ""
-        except Exception as e:
-            logger.error(f"获取阿里云 Token 失败: {e}")
-            return ""
+        self._token = token
 
     def transcribe(self, audio: np.ndarray) -> list[dict]:
-        if not self._app_key:
-            logger.info("CloudASR: 未配置 app_key")
+        if not self._app_key or not self._token:
             return []
-        token = self._get_token()
-        if not token:
-            logger.info("CloudASR: Token 获取失败")
-            return []
-        logger.info(f"CloudASR: Token 已获取, 开始识别 {len(audio)/16000:.1f}s")
         try:
-            import json, threading, time, uuid
+            import json, threading, time
             import websocket
 
             audio_bytes = (np.clip(audio, -1.0, 1.0) * 32767).astype("<i2").tobytes()
             results = []
             done = threading.Event()
 
-            url = f"wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1?token={token}"
+            url = f"wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1?token={self._token}"
             ws = websocket.WebSocketApp(url)
 
-            started = threading.Event()
-
             def on_open(ws_obj):
-                logger.info("CloudASR WS 已连接，发送 StartTranscription…")
                 ws_obj.send(json.dumps({
                     "header": {
-                        "message_id": str(uuid.uuid4()).replace('-', ''),
-                        "task_id": str(uuid.uuid4()).replace('-', ''),
+                        "message_id": f"m_{int(time.time()*1000)}",
+                        "task_id": f"t_{int(time.time()*1000)}",
                         "namespace": "SpeechTranscriber",
-                        "appkey": self._app_key,
                         "name": "StartTranscription",
+                        "appkey": self._app_key,
                     },
-                    "payload": {
-                        "format": "pcm",
-                        "sample_rate": 16000,
-                        "enable_interim_result": True,
-                        "enable_punctuation_prediction": True,
-                        "enable_voice_detection": False,
-                        "max_sentence_silence": 800,
-                    },
-                    "context": {},
+                    "payload": {"format": "pcm", "sample_rate": 16000,
+                                "enable_interim_result": True,
+                                "enable_punctuation_prediction": True},
                 }))
-                # 等待服务器确认后发送音频
-                if started.wait(timeout=5):
-                    for i in range(0, len(audio_bytes), 3200):
-                        ws_obj.send(audio_bytes[i:i+3200], opcode=websocket.ABNF.OPCODE_BINARY)
+                for i in range(0, len(audio_bytes), 3200):
+                    ws_obj.send(audio_bytes[i:i+3200], opcode=websocket.ABNF.OPCODE_BINARY)
                 ws_obj.send(json.dumps({"header": {
-                    "message_id": str(uuid.uuid4()).replace('-', ''), "task_id": _task_id,
-                    "appkey": self._app_key,
+                    "message_id": "stop", "task_id": "stop",
                     "namespace": "SpeechTranscriber", "name": "StopTranscription",
+                    "appkey": self._app_key,
                 }}))
 
             def on_message(ws_obj, msg):
-                logger.info(f"CloudASR raw: {msg[:300]}")
                 try:
                     data = json.loads(msg)
-                    h = data.get("header", {})
-                    name = h.get("name", "")
-                    if name == "TaskFailed":
-                        logger.error(f"CloudASR TaskFailed: {h.get('status_text','')}")
-                        done.set()
-                        return
-                    if name == "TranscriptionStarted":
-                        logger.info("CloudASR: 服务端已就绪，发送音频")
-                        started.set()
-                        return
-                    if name == "TranscriptionResultChanged":
-                        started.set()  # 某些版本可能不返回 TranscriptionStarted
+                    name = data.get("header", {}).get("name", "")
                     text = data.get("payload", {}).get("result", "")
                     if name in ("TranscriptionResultChanged", "SentenceEnd") and text:
                         results.append({"text": text.strip(), "start": 0.0, "end": 0.0})
-                except Exception as e:
-                    logger.error(f"CloudASR msg parse: {e}")
-
-            ws.on_open = on_open
-            ws.on_message = on_message
-            ws.on_error = lambda ws_obj, err: (logger.error(f"CloudASR WS err: {err}"), done.set())
-            ws.on_close = lambda ws_obj, code, reason: (logger.info(f"CloudASR WS close: {code} {reason}"), done.set())
+                except Exception:
+                    pass
 
             t = threading.Thread(target=ws.run_forever)
             t.start()
@@ -197,9 +141,7 @@ class CloudASR(ASRBackend):
 def create_asr(provider: str = "") -> ASRBackend:
     p = provider or config.asr_provider.provider
     if p == "cloud":
-        return CloudASR(config.asr_provider.aliyun_app_key,
-                        config.asr_provider.aliyun_access_key,
-                        config.asr_provider.aliyun_access_secret)
+        return CloudASR(config.asr_provider.aliyun_app_key)
     return LocalASR()
 
 
