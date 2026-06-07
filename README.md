@@ -1,6 +1,6 @@
 # 谛听·译真 DitingVeritas
 
-AI 同声传译助手 — 系统音频实时捕获 → VAD 切句 → ASR 识别 → LLM 翻译 → 悬浮字幕呈现
+一个轻量，极简，好用的 AI 同声传译助手 — 系统音频实时捕获 → VAD 切句 → ASR 识别 → LLM 翻译 → 悬浮字幕呈现
 
 <img src="assets/screenshot.png" alt="DitingVeritas" width="600" /> 
 
