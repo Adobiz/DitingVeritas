@@ -5,6 +5,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# 默认 HF 镜像，国内用户能下载 ASR 模型
+if not os.getenv("HF_ENDPOINT"):
+    os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+
 
 @dataclass
 class AudioConfig:

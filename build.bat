@@ -12,33 +12,14 @@ cd /d "%ROOT%backend"
 if exist ".venv\Scripts\activate.bat" call .venv\Scripts\activate.bat
 pyinstaller --onefile --console --name diting-backend main.py ^
     --distpath dist --workpath build\pyinstaller --specpath build\pyinstaller -y ^
-    --exclude-module torchvision ^
-    --exclude-module torchaudio ^
-    --exclude-module transformers ^
-    --exclude-module tokenizers ^
     --exclude-module datasets ^
-    --exclude-module scipy ^
-    --exclude-module pandas ^
-    --exclude-module matplotlib ^
+    --exclude-module torchvision ^
     --exclude-module gradio ^
-    --exclude-module peft ^
-    --exclude-module accelerate ^
-    --exclude-module tensorboard ^
-    --exclude-module tensorboardX ^
-    --exclude-module sklearn ^
-    --exclude-module cv2 ^
-    --exclude-module PIL ^
-    --exclude-module sympy ^
-    --exclude-module networkx ^
-    --exclude-module h5py ^
-    --exclude-module aiohttp ^
-    --exclude-module yaml ^
-    --exclude-module huggingface_hub ^
-    --exclude-module safetensors ^
-    --exclude-module fsspec ^
+    --exclude-module onnxruntime ^
     --collect-submodules faster_whisper ^
     --collect-submodules ctranslate2 ^
-    --collect-submodules silero_vad
+    --collect-submodules silero_vad ^
+    --collect-data silero_vad
 if %errorlevel% neq 0 (
     echo [ERROR] PyInstaller failed
     pause
