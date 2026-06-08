@@ -29,11 +29,13 @@ npm run electron:build
 
 双击悬浮球「谛」→ ⚙ 设置 → 选择模型 → ▶ 开始 → 播放英文音频即可。
 
-## 一键打包
+## 一键打包启动
 
 ```bash
 build.bat
 ```
+自动生成 DitingVeritas/frontend/release/win-unpacked/DitingVeritas.exe
+双击打开即可运行
 
 ## 功能
 
