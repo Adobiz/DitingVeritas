@@ -9,7 +9,7 @@
 [![Install & Demo](https://img.shields.io/badge/Bilibili-Install%20%26%20Demo-00A1D6?logo=bilibili)](https://www.bilibili.com/video/BV1orE86hEto/)
 
 ## 快速开始
-Release下载exe安装包，双击下载相关前置模型即可使用(经测试好像部分情况存在bug，建议使用常规开始测试)
+Release下载exe安装包，双击下载相关前置模型即可使用(经测试好像部分情况存在bug，建议使用一键打包进行测试)
 ## 常规开始
 ```bash
 # 1. 安装后端依赖
