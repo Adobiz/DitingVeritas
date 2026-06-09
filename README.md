@@ -134,5 +134,4 @@ PIPELINE_MODE=balanced            # turbo | balanced | stable
 ```
 
 ## License
-
-MIT
+未经允许，严禁用于商业用途，仅供学习交流。
