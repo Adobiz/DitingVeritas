@@ -6,7 +6,9 @@
 
 ## Video
 
-[![Install & Demo](https://img.shields.io/badge/Bilibili-Install%20%26%20Demo-00A1D6?logo=bilibili)](https://www.bilibili.com/video/BV1orE86hEto/)
+[![Demo](https://img.shields.io/badge/Bilibili-Demo-00A1D6?logo=bilibili)](https://www.bilibili.com/video/BV1orE86hEto/)
+
+[![Show](https://img.shields.io/badge/Bilibili-Show-00A1D6?logo=bilibili)](https://www.bilibili.com/video/BV1nMES6dE5d/)
 
 ## 项目亮点
 [![闻境](https://img.shields.io/badge/创新-闻境_语境预加载-4ade80?style=flat)](https://github.com/Adobiz/DitingVeritas/blob/master/docs/context_loader.md)
