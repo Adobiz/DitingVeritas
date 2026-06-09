@@ -67,6 +67,7 @@ class TranslationPipeline:
             self.target_lang = req.target_lang
             config.asr.language = req.source_lang  # 同步到 ASR 和翻译
             if req.context: self.context = req.context
+        self._translator = create_translator()  # 热刷新：用最新配置重建翻译器
         ctx = load_context(self.context)
         self._translator.context_block = build_context_block(ctx)
         self.status = PipelineStatus.STARTING
@@ -398,7 +399,7 @@ async def translate_websocket(ws: WebSocket):
                 if data.get("api_key"): config.translator.openai_api_key = data["api_key"]
                 if data.get("api_base_url"): config.translator.openai_base_url = data["api_base_url"]
                 if data.get("model"): config.translator.model = data["model"]
-                if data.get("local_path"): config.translator.local_path = data["local_path"]
+                config.translator.local_path = data.get("local_path") or ""
                 if data.get("pipeline_mode"): config.pipeline_mode = data["pipeline_mode"]
                 if data.get("gpu"):
                     import torch
