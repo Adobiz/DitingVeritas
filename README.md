@@ -9,7 +9,7 @@
 [![Install & Demo](https://img.shields.io/badge/Bilibili-Install%20%26%20Demo-00A1D6?logo=bilibili)](https://www.bilibili.com/video/BV1orE86hEto/)
 
 ## 项目亮点
-[![闻境](https://img.shields.io/badge/创新-闻境_语境预加载-4ade80?style=flat)](https://github.com/Adobiz/DitingVeritas/blob/master/README.md#-闻境--语境预加载)
+[![闻境](https://img.shields.io/badge/创新-闻境_语境预加载-4ade80?style=flat)](https://github.com/Adobiz/DitingVeritas/blob/master/docs/context_loader.md)
 
 ## 快速开始
 Release下载exe安装包，双击下载相关前置模型即可使用(经测试好像部分情况存在bug，建议使用一键打包进行测试)
