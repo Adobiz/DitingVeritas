@@ -11,8 +11,8 @@
 ## 项目亮点
 [![闻境](https://img.shields.io/badge/创新-闻境_语境预加载-4ade80?style=flat)](https://github.com/Adobiz/DitingVeritas/blob/master/docs/context_loader.md)
 
-## 快速开始
-Release下载exe安装包，双击下载相关前置模型即可使用(经测试好像部分情况存在bug，建议使用一键打包进行测试)
+## 快速开始(懒人包)
+Release下载压缩包(001&002)，解压001得到win-unpacked文件夹，内部打开exe运行即可
 ## 常规开始
 ```bash
 # 1. 安装后端依赖
