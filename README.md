@@ -10,6 +10,8 @@
 
 [![Show](https://img.shields.io/badge/Bilibili-Show-00A1D6?logo=bilibili)](https://www.bilibili.com/video/BV1nMES6dE5d/)
 
+[![FAQ](https://img.shields.io/badge/常见问题-FAQ-4ade80?style=flat)](https://github.com/Adobiz/DitingVeritas/blob/master/docs/FAQ.md)
+
 ## 项目亮点
 [![闻境](https://img.shields.io/badge/创新-闻境_语境预加载-4ade80?style=flat)](https://github.com/Adobiz/DitingVeritas/blob/master/docs/context_loader.md)
 
