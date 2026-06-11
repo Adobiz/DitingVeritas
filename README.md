@@ -4,7 +4,7 @@
 
 <img src="assets/screenshot.png" alt="DitingVeritas" width="600" /> 
 
-## Video
+## Video & 文档
 
 [![Demo](https://img.shields.io/badge/Bilibili-Demo-00A1D6?logo=bilibili)](https://www.bilibili.com/video/BV1orE86hEto/)
 
