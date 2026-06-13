@@ -7,7 +7,7 @@
 ## Video & 文档
 
 [![Demo](https://img.shields.io/badge/Bilibili-Demo-00A1D6?logo=bilibili)](https://www.bilibili.com/video/BV1orE86hEto/)
-
+[![Install](https://img.shields.io/badge/Bilibili-Install-00A1D6?logo=bilibili)](https://www.bilibili.com/video/BV1MhJJ6pENG/)
 [![Show](https://img.shields.io/badge/Bilibili-Show-00A1D6?logo=bilibili)](https://www.bilibili.com/video/BV1nMES6dE5d/)
 
 [![FAQ](https://img.shields.io/badge/常见问题-FAQ-4ade80?style=flat)](https://github.com/Adobiz/DitingVeritas/blob/master/docs/FAQ.md)
